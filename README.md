@@ -1,11 +1,12 @@
 # Receipts Processor
 
-A Windows application for automating the issuance of rent receipts for multiple tenants by interacting with the Portuguese Tax Authority platform.
+A Windows application for automating the issuance of rent receipts for multiple tenants by interacting with the Portuguese Tax Authority platform via Autenticação.Gov.
 
 ## Features
 
+- **Autenticação.Gov Integration**: Connects to the official Portuguese government authentication system
 - **CSV Processing**: Load and validate receipt data from CSV files
-- **Web Integration**: Authenticate and interact with the receipts platform
+- **Secure Authentication**: Uses Autenticação.Gov for secure government service access
 - **Dual Processing Modes**: Bulk processing or step-by-step with user confirmation
 - **Dry Run Mode**: Test the process without making actual requests
 - **GUI Interface**: User-friendly Windows application
@@ -16,6 +17,7 @@ A Windows application for automating the issuance of rent receipts for multiple 
 
 - Python 3.8 or higher
 - Windows OS
+- Valid Autenticação.Gov account (Portuguese government digital identity)
 - Dependencies listed in `requirements.txt`
 
 ## Installation
@@ -35,6 +37,14 @@ cd src
 python main.py
 ```
 
+### Authentication
+
+Use your Autenticação.Gov credentials:
+- **Username**: Citizen Card number, email address, or NIF (Tax ID)
+- **Password**: Your Autenticação.Gov password
+
+**Important**: This application connects to the official Portuguese government authentication system (https://www.acesso.gov.pt/v2/login). Your credentials are transmitted securely using HTTPS.
+
 ### CSV File Format
 
 The CSV file should contain the following columns:
@@ -47,7 +57,7 @@ The CSV file should contain the following columns:
 Example:
 ```csv
 contractId,fromDate,toDate,receiptType,value
-123456,2024-01-01,2024-01-31,rent,850.00
+123456,2024-01-01,2024-01-31,rent,100.00
 789012,2024-02-01,2024-02-29,rent,900.50
 ```
 
@@ -63,6 +73,26 @@ Enable dry run mode to test the process without making actual web requests. This
 - Verifying the processing flow
 - Training users on the application
 
+### Testing Mode
+
+For development and testing purposes, the WebClient can be initialized with `testing_mode=True`. This enables:
+- **Mock Authentication**: Use test credentials (`test/test`, `demo/demo`, or `admin/admin`)
+- **Simulated Connections**: Mock responses without actual network requests
+- **Sample Data**: Pre-configured test contracts and receipts
+- **No External Dependencies**: Tests run without internet connection
+
+Example usage:
+```python
+from web_client import WebClient
+
+# Production mode (default)
+client = WebClient()
+
+# Testing mode
+test_client = WebClient(testing_mode=True)
+success, message = test_client.login("test", "test")  # Mock login
+```
+
 ## Testing
 
 Run the test suite:
@@ -70,6 +100,8 @@ Run the test suite:
 cd tests
 python test_suite.py
 ```
+
+The test suite uses testing mode automatically to ensure tests run quickly and reliably without external dependencies.
 
 ## Project Structure
 
@@ -89,6 +121,8 @@ recibos/
 ├── tests/
 │   └── test_suite.py        # Test cases
 ├── logs/                    # Log files (created at runtime)
+├── sample/
+│   └── sample_receipts.csv  # Sample CSV data
 ├── requirements.txt         # Python dependencies
 └── README.md               # This file
 ```

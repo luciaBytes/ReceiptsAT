@@ -1,0 +1,3 @@
+contract_id,from_date,to_date,payment_date,receipt_type,value
+12345,2024-07-01,2024-07-31,2024-07-28,rent,100.00
+67890,2024-07-01,2024-07-31,2024-07-28,rent,900.00

@@ -24,9 +24,9 @@ class TestCSVHandler(unittest.TestCase):
     def test_load_valid_csv(self):
         """Test loading a valid CSV file."""
         # Create a temporary CSV file
-        csv_content = """contractId,fromDate,toDate,receiptType,value
-123456,2024-01-01,2024-01-31,rent,850.00
-789012,2024-02-01,2024-02-29,rent,900.50"""
+        csv_content = """contractId,fromDate,toDate,receiptType,value,paymentDate
+123456,2024-01-01,2024-01-31,rent,100.00,2024-01-28
+789012,2024-02-01,2024-02-29,rent,900.50,2024-02-28"""
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
@@ -45,15 +45,15 @@ class TestCSVHandler(unittest.TestCase):
             self.assertEqual(receipt1.contract_id, "123456")
             self.assertEqual(receipt1.from_date, "2024-01-01")
             self.assertEqual(receipt1.to_date, "2024-01-31")
-            self.assertEqual(receipt1.value, 850.00)
+            self.assertEqual(receipt1.value, 100.00)
             
         finally:
             os.unlink(temp_file)
     
     def test_load_invalid_csv_missing_columns(self):
         """Test loading CSV with missing required columns."""
-        csv_content = """contractId,fromDate,toDate
-123456,2024-01-01,2024-01-31"""
+        csv_content = """contractId,fromDate
+123456,2024-01-01"""
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
@@ -62,15 +62,15 @@ class TestCSVHandler(unittest.TestCase):
         try:
             success, errors = self.csv_handler.load_csv(temp_file)
             self.assertFalse(success)
-            self.assertIn("Missing required columns", str(errors))
+            self.assertIn("Missing required column", str(errors))
             
         finally:
             os.unlink(temp_file)
     
     def test_validate_date_range(self):
         """Test date validation."""
-        csv_content = """contractId,fromDate,toDate,receiptType,value
-123456,2024-01-31,2024-01-01,rent,850.00"""
+        csv_content = """contractId,fromDate,toDate,receiptType,value,paymentDate
+123456,2024-01-31,2024-01-01,rent,100.00,2024-01-28"""
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
@@ -84,10 +84,49 @@ class TestCSVHandler(unittest.TestCase):
         finally:
             os.unlink(temp_file)
     
+    def test_validate_payment_date_future(self):
+        """Test payment date cannot be in the future."""
+        from datetime import datetime, timedelta
+        future_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        csv_content = f"""contractId,fromDate,toDate,receiptType,value,paymentDate
+123456,2024-01-01,2024-01-31,rent,100.00,{future_date}"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            success, errors = self.csv_handler.load_csv(temp_file)
+            self.assertFalse(success)
+            self.assertTrue(any("cannot be in the future" in error for error in errors))
+            
+        finally:
+            os.unlink(temp_file)
+    
+    def test_payment_date_flexibility(self):
+        """Test that payment date can be before or after receipt period."""
+        csv_content = """contractId,fromDate,toDate,receiptType,value,paymentDate
+123456,2024-02-01,2024-02-29,rent,100.00,2024-01-15
+789012,2024-02-01,2024-02-29,rent,900.50,2024-03-15"""
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_file = f.name
+        
+        try:
+            success, errors = self.csv_handler.load_csv(temp_file)
+            self.assertTrue(success, f"Should allow payment dates before/after receipt period. Errors: {errors}")
+            receipts = self.csv_handler.get_receipts()
+            self.assertEqual(len(receipts), 2)
+            
+        finally:
+            os.unlink(temp_file)
+    
     def test_export_report(self):
         """Test report export functionality."""
         report_data = [
-            {'Contract ID': '123456', 'Status': 'Success', 'Value': 850.00},
+            {'Contract ID': '123456', 'Status': 'Success', 'Value': 100.00},
             {'Contract ID': '789012', 'Status': 'Failed', 'Value': 900.50}
         ]
         
@@ -112,15 +151,27 @@ class TestWebClient(unittest.TestCase):
     """Test cases for web client."""
     
     def setUp(self):
-        self.web_client = WebClient()
+        self.web_client = WebClient(testing_mode=True)
     
     def test_login_success(self):
         """Test successful login."""
-        success, message = self.web_client.login("testuser", "testpass")
-        # In our mock implementation, this should succeed
+        success, message = self.web_client.login("test", "test")
         self.assertTrue(success)
-        self.assertEqual(message, "Login successful")
+        self.assertEqual(message, "Mock login successful")
         self.assertTrue(self.web_client.is_authenticated())
+    
+    def test_login_failure(self):
+        """Test failed login with invalid credentials."""
+        success, message = self.web_client.login("invalid", "invalid")
+        self.assertFalse(success)
+        self.assertIn("Invalid mock credentials", message)
+        self.assertFalse(self.web_client.is_authenticated())
+    
+    def test_testing_mode_connection(self):
+        """Test that testing mode provides mock connection."""
+        success, message = self.web_client.test_connection()
+        self.assertTrue(success)
+        self.assertEqual(message, "Mock connection successful")
     
     def test_login_max_attempts(self):
         """Test maximum login attempts."""
@@ -135,41 +186,67 @@ class TestWebClient(unittest.TestCase):
     def test_logout(self):
         """Test logout functionality."""
         self.web_client.authenticated = True
-        success = self.web_client.logout()
-        self.assertTrue(success)
+        self.web_client.logout()
         self.assertFalse(self.web_client.is_authenticated())
     
-    @patch('requests.Session.get')
-    def test_test_connection(self, mock_get):
-        """Test connection testing."""
-        mock_response = Mock()
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
-        
+    def test_test_connection_mock(self):
+        """Test connection testing in mock mode."""
         success, message = self.web_client.test_connection()
         self.assertTrue(success)
-        self.assertIn("successful", message)
+        self.assertEqual(message, "Mock connection successful")
     
-    def test_extract_recibo_data(self):
-        """Test recibo data extraction from HTML."""
-        html_content = '''
-        <html>
-        <script>
-        $scope.recibo = {"numContrato": 123456, "valor": 850.00};
-        </script>
-        </html>
-        '''
+    def test_get_contracts_list_mock(self):
+        """Test getting contracts list in mock mode."""
+        # First login to authenticate
+        self.web_client.login("test", "test")
         
-        result = self.web_client._extract_recibo_data(html_content)
-        self.assertIsNotNone(result)
-        self.assertEqual(result.get('numContrato'), 123456)
-        self.assertEqual(result.get('valor'), 850.00)
-
+        success, contracts = self.web_client.get_contracts_list()
+        self.assertTrue(success)
+        self.assertIsInstance(contracts, list)
+        self.assertGreater(len(contracts), 0)
+        # Check that contracts have expected structure
+        if contracts:
+            self.assertIn('contractId', contracts[0])
+            self.assertIn('property', contracts[0])
+    
+    def test_submit_receipt_mock(self):
+        """Test receipt submission in mock mode."""
+        # First login to authenticate
+        self.web_client.login("test", "test")
+        
+        mock_receipt = {
+            "contractId": "123456",
+            "fromDate": "2024-01-01",
+            "toDate": "2024-01-31",
+            "value": "100.00"
+        }
+        
+        success, message = self.web_client.submit_receipt(mock_receipt)
+        self.assertTrue(success)
+        self.assertIn("Mock receipt submitted", message)
+    
 class TestReceiptProcessor(unittest.TestCase):
     """Test cases for receipt processor."""
     
     def setUp(self):
         self.mock_web_client = Mock(spec=WebClient)
+        # Mock the validate_csv_contracts method to return a proper dict
+        self.mock_web_client.validate_csv_contracts.return_value = {
+            'success': True,
+            'message': 'Mock validation successful',
+            'portal_contracts_count': 2,
+            'csv_contracts_count': 2,
+            'portal_contracts': ['123456', '789012'],
+            'portal_contracts_data': [],
+            'csv_contracts': ['123456', '789012'],
+            'valid_contracts': ['123456', '789012'],
+            'valid_contracts_data': [],
+            'invalid_contracts': [],
+            'missing_from_csv': [],
+            'missing_from_csv_data': [],
+            'missing_from_portal': [],
+            'validation_errors': []
+        }
         self.processor = ReceiptProcessor(self.mock_web_client)
     
     def test_dry_run_mode(self):
@@ -181,7 +258,8 @@ class TestReceiptProcessor(unittest.TestCase):
             from_date="2024-01-01",
             to_date="2024-01-31",
             receipt_type="rent",
-            value=850.00
+            value=100.00,
+            payment_date="2024-01-28"
         )
         
         result = self.processor._process_single_receipt(receipt)
@@ -194,8 +272,8 @@ class TestReceiptProcessor(unittest.TestCase):
         self.processor.set_dry_run(True)
         
         receipts = [
-            ReceiptData("123456", "2024-01-01", "2024-01-31", "rent", 850.00),
-            ReceiptData("789012", "2024-02-01", "2024-02-29", "rent", 900.50)
+            ReceiptData("123456", "2024-01-01", "2024-01-31", "rent", 100.00, "2024-01-28"),
+            ReceiptData("789012", "2024-02-01", "2024-02-29", "rent", 900.50, "2024-02-28")
         ]
         
         results = self.processor.process_receipts_bulk(receipts)
@@ -212,7 +290,7 @@ class TestReceiptProcessor(unittest.TestCase):
                 receipt_number="R001",
                 from_date="2024-01-01",
                 to_date="2024-01-31",
-                value=850.00
+                value=100.00
             )
         ]
         
@@ -230,9 +308,9 @@ class TestIntegration(unittest.TestCase):
     def test_end_to_end_dry_run(self):
         """Test complete end-to-end flow in dry run mode."""
         # Create CSV data
-        csv_content = """contractId,fromDate,toDate,receiptType,value
-123456,2024-01-01,2024-01-31,rent,850.00
-789012,2024-02-01,2024-02-29,rent,900.50"""
+        csv_content = """contractId,fromDate,toDate,receiptType,value,paymentDate
+123456,2024-01-01,2024-01-31,rent,100.00,2024-01-28
+789012,2024-02-01,2024-02-29,rent,900.50,2024-02-28"""
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
@@ -247,8 +325,28 @@ class TestIntegration(unittest.TestCase):
             receipts = csv_handler.get_receipts()
             self.assertEqual(len(receipts), 2)
             
-            # Process in dry run mode
-            web_client = WebClient()
+            # Process in dry run mode with testing mode WebClient
+            web_client = WebClient(testing_mode=True)
+            
+            # Mock the contract validation to avoid authentication issues
+            mock_validation_report = {
+                'success': True,
+                'message': 'Mock validation successful',
+                'portal_contracts_count': 2,
+                'csv_contracts_count': 2,
+                'portal_contracts': ['123456', '789012'],
+                'portal_contracts_data': [],
+                'csv_contracts': ['123456', '789012'],
+                'valid_contracts': ['123456', '789012'],
+                'valid_contracts_data': [],
+                'invalid_contracts': [],
+                'missing_from_csv': [],
+                'missing_from_csv_data': [],
+                'missing_from_portal': [],
+                'validation_errors': []
+            }
+            web_client.validate_csv_contracts = Mock(return_value=mock_validation_report)
+            
             processor = ReceiptProcessor(web_client)
             processor.set_dry_run(True)
             

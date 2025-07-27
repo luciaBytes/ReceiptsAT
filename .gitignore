@@ -132,6 +132,7 @@ dmypy.json
 logs/
 *.log
 credentials
+sample/
 
 # IDE files
 .vscode/
@@ -148,3 +149,6 @@ credentials
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# MD files
+*.md
