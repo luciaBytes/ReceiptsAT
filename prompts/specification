@@ -1,0 +1,78 @@
+# Receipts Project
+
+This project automates the issuance of rent receipts for multiple tenants by interacting with an external platform.
+
+## Process
+- Logs in to a website using a username and password (simulate browser login, handle cookies/sessions).
+- Reads a CSV file with columns: contractId, fromDate, toDate, receiptType, value.
+- For each row, sends a request with the necessary headers and cookies to issue a rent receipt.
+- Handles errors and logs the results.
+- Present a report of the operations that were done, example a list of the names of tennants and contract ids with a success or failure status for receipt issuing, number of receipt, initial and final date of which rent is correspondent to, date of payment and value paid.
+- Optionally, downloads the receipt - to be ignored for now.
+
+## Requirements
+
+### Session and Authentication
+- Log in to the platform using user and password, obtaining session cookies or headers.
+- All subsequent requests must use these session credentials to maintain authentication.
+- Session cookies must be preserved and reused between requests after login. If the session expires, the script should attempt to re-authenticate 3 times and continue.
+- If re-authentication fails, stop the process and report when is done and what is unfinished.
+- Log out at the end of the process, after all requests are finished.
+- Credentials must be stored securely and never in plain text.
+
+### Interaction with User
+- The application must support two modes of operation: bulk and step-by-step.
+- In bulk mode, process all receipts automatically without user intervention.
+- In step-by-step mode, before issuing each receipt, present the user with a prompt showing the receipt data (tenant name, contract number, initial and final dates, payment date, and value paid) and ask for confirmation to proceed. The user should be able to confirm, edit fields before confirming, skip, or cancel the operation for each tenant. GUI
+
+### Receipt Issuing Workflow
+- When performing a GET request to /arrendamento/criarRecibo/<contractId>, the server returns an HTML page with embedded JavaScript that initializes $scope.recibo with the relevant data for that contract.
+- The script must robustly parse the HTML response to extract the recibo initialization data, even if it is embedded within JavaScript code blocks (not just plain JSON).
+- Use this extracted data to pre-fill your own data model or to prepare the POST request for issuing the receipt.
+- Send a POST request to /arrendamento/api/emitirRecibo with the completed receipt data to issue the receipt.
+
+### CSV file
+- Read a CSV file with columns: contractId, fromDate, toDate, receiptType, value.
+- Ignore any other optional fields that may be present.
+- Validate that initial dates cannot be later than final dates and payment date cannot be in the future.
+- If validation fails, present a report of the errors in the file and stop execution.
+
+### Endpoints:
+- List of contracts: GET https://imoveis.portaldasfinancas.gov.pt/arrendamento/consultarElementosContratos/locador
+- Open receipt issuing page for specified contract: GET /arrendamento/criarRecibo/<contractId>
+- https://imoveis.portaldasfinancas.gov.pt/arrendamento/criarRecibo/<contractId>
+- Issue the receipt: POST https://imoveis.portaldasfinancas.gov.pt/arrendamento/api/emitirRecibo
+- See receipt if successful issuing: GET /arrendamento/detalheRecibo/<contractId>/<numReceipt>?sucesso=recibo.create.success
+- Create PDF file of the receipt: GET https://imoveis.portaldasfinancas.gov.pt/arrendamento/imprimirRecibo/<contractId>/<numReceipt>?
+
+### Expected output
+- Windows application
+- Windows installer for the application
+
+### Logging and reporting
+- failed requests, failed to issue receipt, failed to autenticate, invalid CSV rows, authentication errors, successful operations
+- report presented in csv
+- path of the file to be asked to user.
+
+### Security - to be handled later
+- Credentials Storage: Never store user credentials (username/password) in plain text within the code or configuration files.
+Use environment variables or a secure credential manager (e.g., Windows Credential Manager, encrypted files, or a secrets vault).
+If prompting for credentials, do so securely (e.g., hide password input).
+- Session Cookies/Tokens: Store session cookies/tokens only in memory during execution:
+Do not write session data to disk unless encrypted and absolutely necessary.
+Clear session data from memory after logout or on application exit.
+- Transport Security: Always use HTTPS endpoints to prevent interception of credentials and session data.
+- Error Handling: Never log sensitive information (passwords, session tokens, full request headers) in error logs or reports.
+- Installer Security: Ensure the installer does not bundle or expose credentials.
+If the application is distributed, sign the installer to prevent tampering.
+- Dependencies: Use only trusted libraries and keep them up to date to avoid vulnerabilities.
+
+### Notes
+- The project should handle authentication securely.
+- The process should be able to handle multiple tenants in a single run.
+- Error handling and logging should be
+
+## Testing
+- Create unit tests for each functionality and mock data (do not access the actual platform for unit testing).
+- Create a test that logs in to the platform and makes a request to get the list of contracts to test the connection and session validity. - to be detyailed which test will be done, as it is sensitive data.
+- Dry run for the whole process with mock data and without making the actual requests.
