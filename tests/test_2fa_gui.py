@@ -143,10 +143,14 @@ def test_2fa_gui():
     print("📱 Use credentials '2fa' / 'demo' to trigger 2FA")
     print("🔑 Test SMS codes: 123456, 000000, 111111")
     
-    # Don't run the main loop in this test - just show it's working
-    root.update()
-    root.after(2000, root.destroy)  # Close after 2 seconds
-    root.mainloop()
+    # Only run mainloop if this is an interactive test
+    if __name__ == "__main__":
+        root.mainloop()
+    else:
+        # For automated testing, just update once and destroy
+        root.update()
+        root.after(100, root.destroy)
+        root.mainloop()
 
 if __name__ == "__main__":
     test_2fa_gui()

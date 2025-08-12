@@ -59,8 +59,8 @@ def main():
     test_suites = [
         {
             "name": "Core Test Suite",
-            "command": "python -m pytest tests/ -v --tb=short",
-            "description": "Main unit tests for core functionality"
+            "command": "python -m pytest tests/ -v --tb=short --ignore=tests/test_validation_aesthetic.py --ignore=tests/test_corrected_export.py --ignore=tests/test_2fa_gui.py",
+            "description": "Main unit tests for core functionality (excluding GUI tests with mainloop)"
         },
         {
             "name": "Authentication Tests",

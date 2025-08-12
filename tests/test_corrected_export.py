@@ -65,7 +65,14 @@ def test_export_functionality():
         print(f"\n🎯 Dialog created - check export button functionality!")
         print(f"   The export button should behave exactly like main window export.")
         
-        root.mainloop()
+        # Only run mainloop if this is an interactive test
+        if __name__ == "__main__":
+            root.mainloop()
+        else:
+            # For automated testing, just update once and destroy
+            root.update()
+            root.after(100, root.destroy)
+            root.mainloop()
         
     except ImportError as e:
         print(f"❌ Could not import GUI components: {e}")

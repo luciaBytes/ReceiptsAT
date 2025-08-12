@@ -68,7 +68,14 @@ def test_validation_dialog():
         print("   - Export button next to OK button")
         print("   - Clean messagebox aesthetic")
         
-        root.mainloop()
+        # Only run mainloop if this is an interactive test
+        if __name__ == "__main__":
+            root.mainloop()
+        else:
+            # For automated testing, just update once and destroy
+            root.update()
+            root.after(100, root.destroy)
+            root.mainloop()
         
     except ImportError as e:
         print(f"❌ Could not import GUI components: {e}")
