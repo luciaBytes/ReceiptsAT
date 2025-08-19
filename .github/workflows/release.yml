@@ -108,11 +108,33 @@ jobs:
         
     - name: Run unit tests
       run: |
+        echo "=== Running unit tests ==="
         python scripts/run_tests.py
+        echo "=== Unit tests completed ==="
+        
+    - name: Check build dependencies
+      run: |
+        echo "=== Checking build environment ==="
+        echo "Current directory: $PWD"
+        echo "Python version:"
+        python --version
+        echo "PyInstaller version:"
+        python -c "import PyInstaller; print(PyInstaller.__version__)"
+        echo "Available batch files:"
+        Get-ChildItem -Name "*.bat"
+        echo "Build directory contents:"
+        Get-ChildItem -Path "build" -Name
         
     - name: Build application
       run: |
-        ./build_all.bat
+        echo "=== Starting build process ==="
+        echo "Current directory: %CD%"
+        echo "Checking if build_all.bat exists..."
+        dir build_all.bat
+        echo "=== Executing build_all.bat ==="
+        .\build_all.bat
+        echo "=== Build process completed ==="
+      shell: cmd
         
     - name: Get version
       id: get-version
