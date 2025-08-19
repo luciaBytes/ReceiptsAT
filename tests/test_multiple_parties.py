@@ -138,7 +138,10 @@ def test_multiple_landlord_extraction():
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"✗ Tenant JSON parsing failed: {e}")
     
-    return contract_details
+    # Assertions to verify the extraction worked
+    assert contract_details is not None, "Contract details should not be None"
+    assert 'locadores' in contract_details, "Contract should have locadores"
+    assert 'locatarios' in contract_details, "Contract should have locatarios"
 
 def test_submission_data_with_multiple_landlords():
     """Test submission data preparation with multiple landlords."""
@@ -247,7 +250,10 @@ def test_submission_data_with_multiple_landlords():
     print("\nLocatarios section:")
     print(json.dumps(locatarios_list, indent=2, ensure_ascii=False))
     
-    return locadores_list, locatarios_list, tenant_name_for_report
+    # Assertions to verify the submission data
+    assert len(locadores_list) > 0, "Should have at least one landlord"
+    assert len(locatarios_list) > 0, "Should have at least one tenant"
+    assert tenant_name_for_report is not None, "Tenant name for report should be set"
 
 if __name__ == "__main__":
     print("=== Multiple Landlord & Tenant Name Support Test ===\n")

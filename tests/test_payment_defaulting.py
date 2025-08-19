@@ -16,11 +16,11 @@ def test_payment_date_defaulting():
     
     # Test CSV file with mixed payment dates
     csv_handler = CSVHandler()
-    success, errors = csv_handler.load_csv("test_payment_default.csv")
+    success, errors = csv_handler.load_csv("tests/test_payment_default.csv")
     
     if not success:
         print(f"Failed to load CSV: {errors}")
-        return False
+        assert success, f"CSV loading failed: {errors}"
     
     receipts = csv_handler.get_receipts()
     
@@ -83,7 +83,7 @@ def test_payment_date_defaulting():
     else:
         print("❌ Some tests failed. Check the payment date defaulting logic.")
     
-    return tests_passed == total_tests
+    assert tests_passed == total_tests, f"Only {tests_passed}/{total_tests} tests passed"
 
 if __name__ == "__main__":
     try:

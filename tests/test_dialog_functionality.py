@@ -147,7 +147,7 @@ def test_step_by_step_dialog():
     else:
         print("❌ Some tests failed. Check the step-by-step implementation.")
     
-    return tests_passed == total_tests
+    assert tests_passed == total_tests, f"Only {tests_passed}/{total_tests} tests passed"
 
 if __name__ == "__main__":
     test_step_by_step_dialog()

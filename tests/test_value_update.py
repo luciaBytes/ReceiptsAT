@@ -24,11 +24,11 @@ def test_step_by_step_value_update():
     
     # Load CSV with missing values
     csv_handler = CSVHandler()
-    success, errors = csv_handler.load_csv("test_missing_value.csv")
+    success, errors = csv_handler.load_csv("tests/test_missing_value.csv")
     
     if not success:
         print(f"Failed to load CSV: {errors}")
-        return False
+        assert success, f"CSV loading failed: {errors}"
     
     receipts = csv_handler.get_receipts()
     print(f"Loaded {len(receipts)} receipts")
@@ -94,7 +94,7 @@ def test_step_by_step_value_update():
     else:
         print("❌ Value updating needs to be fixed")
     
-    return tests_passed == total_tests
+    assert tests_passed == total_tests, f"Only {tests_passed}/{total_tests} tests passed"
 
 if __name__ == "__main__":
     try:

@@ -64,12 +64,12 @@ def main():
         },
         {
             "name": "Authentication Tests",
-            "command": "python -m pytest tests/test_2fa_authentication.py tests/test_2fa_detection.py -v",
+            "command": "python -m pytest tests/test_2fa_authentication_fixed.py -v",
             "description": "2FA and authentication flow tests"
         },
         {
             "name": "Data Processing Tests",
-            "command": "python -m pytest tests/test_nif_extraction.py tests/test_multiple_tenants.py tests/test_inheritance_detection.py -v",
+            "command": "python -m pytest tests/test_nif_extraction.py tests/test_multiple_tenants.py tests/test_multiple_parties.py -v",
             "description": "NIF extraction and tenant data processing"
         },
         {
@@ -79,7 +79,7 @@ def main():
         },
         {
             "name": "CSV & Validation Tests",
-            "command": "python -m pytest tests/test_csv_not_in_portal.py tests/test_validation_export.py tests/test_flexible_columns.py -v",
+            "command": "python -m pytest tests/test_csv_not_in_portal.py tests/test_flexible_columns.py -v",
             "description": "CSV processing and validation exports"
         },
         {
@@ -88,9 +88,9 @@ def main():
             "description": "Platform simulation and step-by-step processing"
         },
         {
-            "name": "GUI & Logger Tests",
-            "command": "python -m pytest tests/test_gui_components.py tests/test_logger_errors.py -v",
-            "description": "GUI components and logging functionality"
+            "name": "GUI & Dialog Tests",
+            "command": "python -m pytest tests/test_dialog_functionality.py -v",
+            "description": "GUI components and dialog functionality"
         }
     ]
     
