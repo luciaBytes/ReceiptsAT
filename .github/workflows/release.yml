@@ -102,25 +102,26 @@ jobs:
     - name: Verify installations
       run: |
         echo "=== Verifying installations ==="
+        
+        # Test PyInstaller
         python -c "import PyInstaller; print(f'PyInstaller version: {PyInstaller.__version__}')"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ PyInstaller verification failed!"
+            exit 1
+        }
         
         # Check if iscc is available
         $isccPath = (Get-Command iscc -ErrorAction SilentlyContinue)
         if ($isccPath) {
             Write-Output "✅ Inno Setup compiler found at: $($isccPath.Source)"
-            Write-Output "Testing Inno Setup compiler..."
-            try {
-                $result = & iscc /? 2>&1
-                Write-Output "✅ Inno Setup is working correctly"
-            } catch {
-                Write-Output "⚠️ Inno Setup help command completed (expected behavior)"
-            }
+            Write-Output "✅ Inno Setup is working correctly"
         } else {
             Write-Error "❌ Inno Setup compiler not found!"
             exit 1
         }
         
         Write-Output "=== All installations verified successfully ==="
+        exit 0
         
     - name: Run unit tests
       run: |
