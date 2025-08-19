@@ -1,0 +1,88 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Install Inno Setup
+      run: |
+        choco install innosetup
+    
+    - name: Build application
+      run: |
+        ./build_all.bat
+    
+    - name: List build outputs
+      run: |
+        echo "=== Releases folder ==="
+        dir releases/
+        echo "=== Dist folder ==="
+        dir dist/
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-installer
+        path: releases/*.exe
+        retention-days: 30
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: releases/*.exe
+        name: Portal das Finanças Receipts ${{ github.ref_name }}
+        body: |
+          ## 📋 Portal das Finanças Receipts ${{ github.ref_name }}
+          
+          ### ✨ What's New
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for detailed changes.
+          
+          ### 📦 Installation
+          1. Download `PortalReceiptsApp_Setup_${{ github.ref_name }}.exe` below
+          2. Run the installer as administrator  
+          3. Follow the setup wizard
+          4. Launch from Start Menu or desktop shortcut
+          
+          ### 💻 System Requirements
+          - Windows 10/11 (64-bit)
+          - Internet connection for portal access
+          - 50MB free disk space
+          - No additional dependencies required
+          
+          ### 🔒 Security Note
+          This is an official release with verified source code. The installer is built automatically from the tagged source.
+          
+          ### 📞 Support
+          - [Report issues](https://github.com/${{ github.repository }}/issues)
+          - [Ask questions](https://github.com/${{ github.repository }}/discussions)
+          - [View documentation](https://github.com/${{ github.repository }}/wiki)
+          
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

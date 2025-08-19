@@ -22,11 +22,40 @@ A Windows application for automating the issuance of rent receipts for multiple 
 
 ## Installation
 
+### For End Users (Recommended)
+Download and run the Windows installer:
+1. Get `PortalReceiptsApp_Setup_v1.0.0.exe` from your administrator
+2. Run the installer and follow the wizard
+3. Launch from Start Menu → Portal das Finanças Receipts
+4. No Python installation required!
+
+See `USER_INSTALLATION_GUIDE.md` for detailed instructions.
+
+### For Developers
 1. Clone or download the project
 2. Install dependencies:
    ```cmd
    pip install -r requirements.txt
    ```
+
+## Building the Executable
+
+### Quick Build
+```cmd
+# Complete build process (executable + installer)
+build_complete.bat
+```
+
+### Manual Build
+```cmd
+# Build the executable only
+build_app.bat
+
+# Create Windows installer
+build_installer.bat
+```
+
+For detailed build instructions, see `BUILD_GUIDE.md`.
 
 ## Usage
 
@@ -156,7 +185,15 @@ The application creates detailed logs in the `logs/` directory with:
 - Web client uses simulated authentication (not actual platform integration)
 - Step-by-step mode auto-confirms all receipts (GUI confirmation dialog not implemented)
 - No actual PDF download functionality
-- Windows installer not included in this implementation
+
+## Distribution
+
+This application includes:
+- **Professional Windows installer** - No Python required for end users
+- **Complete documentation** - Build guides and user instructions
+- **Automated build scripts** - Easy executable creation process
+
+See `DISTRIBUTION_GUIDE.md` for deployment options.
 
 ## Development
 

@@ -68,6 +68,7 @@ if %ERRORLEVEL% EQU 0 (
     echo 2. Tag version: v1.0.0
     echo 3. Upload both files above
     echo 4. Copy release notes from CHANGELOG.md
+    exit /b 0
 ) else (
     echo ❌ ERROR: Failed to create release package
     exit /b 1
