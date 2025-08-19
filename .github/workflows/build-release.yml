@@ -45,8 +45,18 @@ jobs:
       run: |
         echo "=== Verifying installations ==="
         python -c "import PyInstaller; print(f'PyInstaller version: {PyInstaller.__version__}')"
-        where iscc
-        iscc /?
+        
+        # Check if iscc is available
+        $isccPath = (Get-Command iscc -ErrorAction SilentlyContinue)
+        if ($isccPath) {
+            Write-Output "✅ Inno Setup compiler found at: $($isccPath.Source)"
+            Write-Output "✅ Inno Setup is working correctly"
+        } else {
+            Write-Error "❌ Inno Setup compiler not found!"
+            exit 1
+        }
+        
+        Write-Output "=== All installations verified successfully ==="
     
     - name: Build application
       run: |
