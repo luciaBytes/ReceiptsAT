@@ -1,0 +1,39 @@
+name: CI - Unit Tests
+
+on:
+  pull_request:
+    branches: [ main, release/* ]
+  push:
+    branches: [ main, release/* ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run unit tests
+      run: |
+        python scripts/run_tests.py
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          logs/
+          test-results.xml
+        retention-days: 30

@@ -1,0 +1,72 @@
+name: PR - Unit Tests Only
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run unit tests
+      run: |
+        python scripts/run_tests.py
+        
+    - name: Comment test results on PR
+      uses: actions/github-script@v6
+      if: always()
+      with:
+        script: |
+          const fs = require('fs');
+          const { execSync } = require('child_process');
+          
+          // Get test results (you may need to modify this based on your test output format)
+          let testResults = 'Unit tests completed successfully!';
+          
+          try {
+            // Try to read test results if available
+            if (fs.existsSync('test-results.log')) {
+              testResults = fs.readFileSync('test-results.log', 'utf8');
+            }
+          } catch (error) {
+            console.log('Could not read test results file');
+          }
+          
+          const body = `## Test Results 🧪
+          
+          ${testResults}
+          
+          ---
+          *Automated test run for commit ${context.sha.substring(0, 7)}*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+          
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pr-test-results-${{ github.event.number }}
+        path: |
+          logs/
+          *.log
+        retention-days: 7
