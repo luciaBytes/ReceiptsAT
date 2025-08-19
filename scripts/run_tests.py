@@ -144,7 +144,14 @@ Working Directory: {os.getcwd()}
             "stderr": stderr
         })
     
+    # Calculate totals
     total_tests = total_passed + total_failed
+    
+    # Calculate success rate safely
+    if total_tests > 0:
+        success_rate = f"{(total_passed/total_tests*100):.1f}%"
+    else:
+        success_rate = "N/A"
     
     # Print summary
     print(f"""
@@ -157,7 +164,7 @@ SUMMARY:
    • Passed: {total_passed}
    • Failed: {total_failed}
    • Total Duration: {total_duration:.2f}s
-   • Success Rate: {(total_passed/total_tests*100):.1f}% if total_tests > 0 else "N/A"
+   • Success Rate: {success_rate}
 
 DETAILED RESULTS:
 """)
