@@ -26,18 +26,18 @@ if exist "..\dist" (
 if exist "dist\PortalReceiptsApp" (
     mkdir "..\dist" >nul 2>&1
     move "dist\PortalReceiptsApp" "..\dist\" >nul 2>&1
-    echo ✅ Moved executable to project dist directory
+    echo Moved executable to project dist directory
 )
 
 if %ERRORLEVEL% EQU 0 (
-    echo ✅ Executable built successfully!
+    echo Executable built successfully!
     if exist "..\dist\PortalReceiptsApp\PortalReceiptsApp.exe" (
         echo Location: ..\dist\PortalReceiptsApp\PortalReceiptsApp.exe
     ) else (
         echo Location: .\dist\PortalReceiptsApp\PortalReceiptsApp.exe
     )
 ) else (
-    echo ❌ ERROR: Failed to build executable
+    echo ERROR: Failed to build executable
     exit /b 1
 )
 echo Build completed successfully!

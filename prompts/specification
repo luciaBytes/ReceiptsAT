@@ -2,6 +2,14 @@
 
 This project automates the issuance of rent receipts for multiple tenants through the Portuguese Tax Authority's online platform (Portal das Finanças) using the unified Autenticação.Gov authentication system.
 
+## Development Guidelines
+
+**Code Standards**:
+- **NO UNICODE CHARACTERS**: Never use emojis or special Unicode characters (✅❌🎉📦📁⚠️🧪🚀) in any code, scripts, or workflows
+- **Windows Compatibility**: All scripts must be compatible with Windows cp1252 encoding
+- **Plain Text Output**: Use plain text for all console output, error messages, and status indicators
+- **Cross-Platform**: Ensure code works across different Windows environments and locales
+
 ## Current Implementation Status
 
 ### ✅ Authentication System (COMPLETED)
@@ -436,11 +444,32 @@ All major features have been implemented and thoroughly tested. The application 
 - **Output Size**: 12MB compressed installer with all dependencies included
 
 **Build System Components**:
-- `build_all.bat` - Master build script for complete build process
-- `scripts/build_executable.bat` - Creates standalone Windows executable (~50MB)
-- `scripts/build_installer.bat` - Creates professional Windows installer
-- `build/package_release.bat` - Creates distribution packages and ZIP files
+- `build_all.bat` - Master build script with dynamic version reading from `.version` file
+- `build/build_executable.bat` - Creates standalone Windows executable with PyInstaller 6.15.0
+- `build/build_installer.bat` - Creates professional installer with Inno Setup 6 and version parameters
+- `build/package_release.bat` - Creates distribution packages with versioned filenames
 - `receipts_app.spec` - PyInstaller configuration for optimal bundling
+- `installer_script.iss` - Inno Setup script accepting version parameters via /DMyAppVersion
+
+**Dynamic Versioning Integration**:
+```batch
+REM Version reading implementation in build scripts:
+set /p VERSION=<.version
+echo Building version: %VERSION%
+
+REM PyInstaller with version:
+pyinstaller --clean receipts_app.spec --distpath dist
+
+REM Inno Setup with dynamic version:
+iscc installer_script.iss "/DMyAppVersion=%VERSION%"
+```
+
+**Critical Implementation Details**:
+- **Unicode-Free Scripts**: All build scripts must use plain ASCII text only
+- **Version File Format**: `.version` contains single line with version number (e.g., "1.0.7")
+- **Windows Compatibility**: Scripts tested for cp1252 encoding compatibility
+- **Error Handling**: All scripts include error checking and status reporting
+- **Dependency Management**: Automated installation of PyInstaller and Inno Setup in CI
 
 **Installer Features**:
 - Professional Windows installer with proper uninstall support
@@ -475,87 +504,96 @@ dist/
 4. Desktop shortcut and Start menu entry created
 5. Ready to use - no additional setup required
 
-### ✅ GitHub Actions CI/CD Pipeline (COMPLETED)
+### GitHub Actions CI/CD Pipeline (COMPLETED)
 - **Status**: Fully implemented and automated
-- **Workflow Files**: 4 comprehensive GitHub Actions workflows
-- **Testing**: Automated unit testing on PR creation and merge
-- **Building**: Automated executable and installer creation
-- **Releasing**: Automated release creation with version management
+- **Workflow Files**: 3 streamlined GitHub Actions workflows
+- **Testing**: Automated unit testing with 100% pass rate (61 tests across 7 suites)
+- **Building**: Automated Windows executable and installer creation
+- **Releasing**: Automated release creation with dynamic versioning
 
-**CI/CD Workflows**:
+**Active CI/CD Workflows**:
 
-1. **Pull Request Testing** (`.github/workflows/pr-tests.yml`)
-   - **Trigger**: PR opened/updated targeting main branch
-   - **Actions**: Run 61 unit tests, post results as PR comment
-   - **Artifacts**: Test results and logs (7-day retention)
-   - **Purpose**: Ensure code quality before merge
-
-2. **Continuous Integration** (`.github/workflows/ci.yml`)
-   - **Trigger**: Push to main or release/* branches
-   - **Actions**: Comprehensive testing with artifact uploads
-   - **Artifacts**: Test results and logs (30-day retention)
-   - **Purpose**: Validate main development branches
-
-3. **Release Automation** (`.github/workflows/release.yml`)
-   - **Trigger**: Merge to main branch
+1. **Continuous Integration** (`.github/workflows/ci.yml`)
+   - **Trigger**: 
+     - PRs targeting main or release/* branches
+     - Pushes to any branch
    - **Actions**: 
-     - Auto-increment patch version (if not manually changed)
-     - Build Windows executable and installer
-     - Create release branch (`release/vX.Y.Z`)
+     - Run complete test suite (61 tests)
+     - Post results as PR comments with test status
+     - Upload test artifacts (7-day retention)
+   - **Features**: Conditional PR testing, comprehensive push testing
+   - **Purpose**: Ensure code quality and comprehensive testing coverage
+
+2. **Release Automation** (`.github/workflows/release.yml`)
+   - **Trigger**: Git tags matching `v*` pattern (e.g., v1.0.7)
+   - **Actions**: 
+     - Run complete test suite for validation
+     - Install build dependencies (PyInstaller 6.15.0, Inno Setup 6)
+     - Build Windows executable using PyInstaller
+     - Create professional installer with Inno Setup
      - Create GitHub release with built artifacts
-     - Upload installer and complete package
-   - **Purpose**: Fully automated release process
+   - **Artifacts**: Windows installer and complete release package
+   - **Purpose**: Automated production releases with professional packaging
 
-4. **Release Branch Testing** (`.github/workflows/release-branch.yml`)
-   - **Trigger**: Activity on release/* branches
-   - **Actions**: Testing and building on release branches
-   - **Purpose**: Validate release candidates
+3. **Build Testing** (`.github/workflows/build-release.yml`)
+   - **Trigger**: PRs targeting main branch (build validation only)
+   - **Actions**:
+     - Install and verify PyInstaller and Inno Setup
+     - Test build process without creating release
+     - Validate build system dependencies
+   - **Purpose**: Ensure build system works before merge
 
-**Version Management System**:
-- **Version File**: `.version` contains current version (e.g., "1.0.0")
-- **Automatic Patch Bumping**: If `.version` unchanged in PR, auto-increment patch
-- **Manual Version Control**: Update `.version` in PR for specific releases
-- **Release Artifacts**: Each release includes:
-  - Windows installer (`PortalReceiptsApp_Setup_vX.Y.Z.exe`)
-  - Complete package (`PortalReceiptsApp_vX.Y.Z_Release.zip`)
-  - Auto-generated release notes
-  - Professional metadata and documentation
+**Dynamic Versioning System**:
+- **Version File**: `.version` contains current version (format: "1.0.7")
+- **Build Integration**: All build scripts read version dynamically from `.version` file
+- **Filename Consistency**: Executables and installers named with current version
+- **Manual Control**: Update `.version` file to control release versions
+- **Tag-Based Releases**: Create git tag (e.g., `git tag v1.0.7`) to trigger automated release
 
-**Release Process Flow**:
-```
-1. Developer creates PR with changes
-2. Unit tests run automatically on PR
-3. PR merged to main branch
-4. CI/CD detects merge, checks version
-5. If version unchanged: auto-bump patch (1.0.0 → 1.0.1)
-6. If version manually changed: use specified version
-7. Build process creates executable and installer
-8. Release branch created: release/vX.Y.Z
-9. Git tag created: vX.Y.Z
-10. GitHub release created with artifacts
-11. Ready for distribution
+**Build System Integration**:
+```batch
+REM All build scripts read version dynamically:
+REM build_all.bat - Master build coordination
+REM build/build_executable.bat - PyInstaller with version
+REM build/build_installer.bat - Inno Setup with version parameter
+REM build/package_release.bat - Release packaging with version
 ```
 
 **Quality Assurance**:
-- **Test Coverage**: 61 unit tests across 7 test suites (100% pass rate)
-- **Build Validation**: Every release is fully built and tested
-- **Automated Testing**: No manual intervention required
-- **Professional Packaging**: Enterprise-grade installer and documentation
-- **Version Tracking**: Complete version history and changelog
+- **Unicode Compatibility**: All scripts cleaned of problematic Unicode characters
+- **Windows Encoding**: Full cp1252 encoding compatibility
+- **Test Coverage**: 61 unit tests with 100% pass rate across all components
+- **Build Validation**: Every workflow validates build dependencies
+- **Professional Output**: Clean console output without decorative characters
+
+**Release Process Flow**:
+```
+1. Update .version file (e.g., "1.0.8")
+2. Commit changes to main branch
+3. Create and push git tag: git tag v1.0.8 && git push origin v1.0.8
+4. GitHub Actions automatically:
+   - Runs all 61 tests
+   - Builds Windows executable (receipts_app.exe)
+   - Creates Inno Setup installer (PortalReceiptsApp_Setup_v1.0.8.exe)
+   - Creates GitHub release with artifacts
+5. Release ready for distribution
+```
 
 **Distribution Ready**:
-- **GitHub Releases**: Professional releases with proper versioning
-- **Windows Installer**: One-click installation for end users
-- **Complete Documentation**: Installation guides and user manuals
-- **Automated Updates**: CI/CD enables rapid iteration and updates
+- **GitHub Releases**: Professional releases with proper versioning via git tags
+- **Windows Installer**: One-click installation for end users (12MB compressed)
+- **Version Control**: Manual version control via `.version` file updates
+- **Automated Testing**: CI/CD runs 61 tests on every release
+- **Unicode-Free Codebase**: Complete compatibility with Windows encoding standards
 
-### 🚀 Production Deployment Ready
+### Production Deployment Ready
 The project includes complete build system and CI/CD automation:
-- Professional Windows installer creation
-- Automated testing and quality assurance
-- Version management and release automation
+- Professional Windows installer creation with dynamic versioning
+- Automated testing and quality assurance (61 tests, 100% pass rate)
+- Tag-based release automation via GitHub Actions
 - GitHub Actions workflow for continuous deployment
 - Enterprise-grade distribution packaging
+- Complete Unicode character cleanup for Windows compatibility
 
 ## Project Completion Summary
 
@@ -593,7 +631,7 @@ This Portuguese Tax Authority Receipt Automation System is **100% complete** and
 - **Build**: PyInstaller + Inno Setup for professional distribution
 
 **Ready for End Users**:
-1. Download `PortalReceiptsApp_Setup_v1.0.0.exe`
+1. Download installer from GitHub releases (`PortalReceiptsApp_Setup_v1.0.7.exe`)
 2. Run installer (one-click installation)
 3. Launch application from desktop or Start menu
 4. Load CSV file with contract data
@@ -602,9 +640,10 @@ This Portuguese Tax Authority Receipt Automation System is **100% complete** and
 
 **Ready for Developers**:
 1. Clone repository
-2. GitHub Actions automatically handle testing and building
-3. Merge to main creates automatic releases
-4. Professional CI/CD pipeline manages entire workflow
+2. Update `.version` file for new releases
+3. Create git tag matching version: `git tag v1.0.8 && git push origin v1.0.8`
+4. GitHub Actions automatically builds and releases
+5. Professional CI/CD pipeline manages entire workflow
 
-### 🎯 Project Status: PRODUCTION COMPLETE
-All requirements fulfilled, fully tested, professionally packaged, and ready for widespread distribution.
+### Project Status: PRODUCTION COMPLETE
+All requirements fulfilled, fully tested, professionally packaged, Unicode-free codebase, and ready for widespread distribution with streamlined CI/CD automation.
