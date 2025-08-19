@@ -153,5 +153,10 @@ sample/
 ehthumbs.db
 Thumbs.db
 
-# MD files
-*.md
+# Generated/temporary MD files only
+releases/**/*.md
+dist/**/*.md
+build/**/*.md
+*.tmp.md
+*_BACKUP_*.md
+*_TEMP_*.md
