@@ -48,17 +48,17 @@ jobs:
         # Test PyInstaller
         python -c "import PyInstaller; print(f'PyInstaller version: {PyInstaller.__version__}')"
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ PyInstaller verification failed!"
+            Write-Error "PyInstaller verification failed!"
             exit 1
         }
         
         # Check if iscc is available
         $isccPath = (Get-Command iscc -ErrorAction SilentlyContinue)
         if ($isccPath) {
-            Write-Output "✅ Inno Setup compiler found at: $($isccPath.Source)"
-            Write-Output "✅ Inno Setup is working correctly"
+            Write-Output "Inno Setup compiler found at: $($isccPath.Source)"
+            Write-Output "Inno Setup is working correctly"
         } else {
-            Write-Error "❌ Inno Setup compiler not found!"
+            Write-Error "Inno Setup compiler not found!"
             exit 1
         }
         
@@ -98,7 +98,7 @@ jobs:
           ### ✨ What's New
           See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/docs/CHANGELOG.md) for detailed changes.
           
-          ### 📦 Installation
+          ### Installation
           1. Download `PortalReceiptsApp_Setup_${{ github.ref_name }}.exe` below
           2. Run the installer as administrator  
           3. Follow the setup wizard

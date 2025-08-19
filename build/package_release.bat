@@ -5,7 +5,7 @@ cd /d "%~dp0\.."
 
 rem Check if installer exists
 if not exist "releases\PortalReceiptsApp_Setup_v1.0.0.exe" (
-    echo ❌ ERROR: Installer not found. Run build_installer.bat first.
+    echo ERROR: Installer not found. Run build_installer.bat first.
     exit /b 1
 )
 
@@ -56,7 +56,7 @@ rem Create ZIP package
 powershell -Command "Compress-Archive -Path '%RELEASE_DIR%\*' -DestinationPath 'releases\PortalReceiptsApp_v1.0.0_Release.zip' -Force"
 
 if %ERRORLEVEL% EQU 0 (
-    echo ✅ Release package created successfully!
+    echo Release package created successfully!
     echo.
     echo Files ready for distribution:
     echo - releases\PortalReceiptsApp_Setup_v1.0.0.exe          (12MB installer)
@@ -70,6 +70,6 @@ if %ERRORLEVEL% EQU 0 (
     echo 4. Copy release notes from CHANGELOG.md
     exit /b 0
 ) else (
-    echo ❌ ERROR: Failed to create release package
+    echo ERROR: Failed to create release package
     exit /b 1
 )

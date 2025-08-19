@@ -37,13 +37,20 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+rem Read version for display
+if exist ".version" (
+    set /p APP_VERSION=<.version
+) else (
+    set APP_VERSION=1.0.0
+)
+
 echo.
 echo ======================================
-echo ✅ BUILD COMPLETED SUCCESSFULLY!
+echo BUILD COMPLETED SUCCESSFULLY!
 echo ======================================
 echo.
-echo 📦 Installer: releases\PortalReceiptsApp_Setup_v1.0.0.exe
-echo 📁 Release folder: releases\
+echo Installer: releases\PortalReceiptsApp_Setup_v%APP_VERSION%.exe
+echo Release folder: releases\
 echo.
 echo Ready for distribution!
 echo.

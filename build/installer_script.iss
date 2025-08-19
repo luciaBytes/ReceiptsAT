@@ -2,7 +2,9 @@
 ; This script creates a professional Windows installer
 
 #define MyAppName "Portal das Finanças Receipts"
-#define MyAppVersion "1.0.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.0"
+#endif
 #define MyAppPublisher "LuciaBytes"
 #define MyAppURL "https://github.com/luciaBytes/receipts"
 #define MyAppExeName "PortalReceiptsApp.exe"
