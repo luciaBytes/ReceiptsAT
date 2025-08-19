@@ -12,7 +12,7 @@ from datetime import datetime
 def run_command(cmd, description):
     """Run a command and capture output."""
     print(f"\n{'='*60}")
-    print(f"🧪 {description}")
+    print(f"TEST: {description}")
     print(f"{'='*60}")
     
     start_time = time.time()
@@ -29,30 +29,30 @@ def run_command(cmd, description):
         end_time = time.time()
         duration = end_time - start_time
         
-        print(f"⏱️  Duration: {duration:.2f}s")
-        print(f"📤 Exit Code: {result.returncode}")
+        print(f"Duration: {duration:.2f}s")
+        print(f"Exit Code: {result.returncode}")
         
         if result.stdout:
-            print(f"\n📊 Output:\n{result.stdout}")
+            print(f"\nOutput:\n{result.stdout}")
         
         if result.stderr and result.returncode != 0:
-            print(f"\n❌ Errors:\n{result.stderr}")
+            print(f"\nErrors:\n{result.stderr}")
             
         return result.returncode == 0, result.stdout, result.stderr, duration
         
     except Exception as e:
-        print(f"❌ Failed to run command: {e}")
+        print(f"Failed to run command: {e}")
         return False, "", str(e), 0
 
 def main():
     """Run all test suites."""
     
     print(f"""
-🚀 Portal das Finanças Receipts - Test Suite Runner
+Portal das Financas Receipts - Test Suite Runner
 {"="*60}
-📅 Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🐍 Python: {sys.version.split()[0]}
-📁 Working Directory: {os.getcwd()}
+Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Python: {sys.version.split()[0]}
+Working Directory: {os.getcwd()}
 """)
     
     # Test configurations
@@ -149,30 +149,30 @@ def main():
     # Print summary
     print(f"""
 
-🏁 TEST EXECUTION COMPLETE
+TEST EXECUTION COMPLETE
 {"="*60}
-📊 SUMMARY:
+SUMMARY:
    • Total Test Suites: {len(test_suites)}
    • Total Tests: {total_tests}
-   • ✅ Passed: {total_passed}
-   • ❌ Failed: {total_failed}
-   • ⏱️  Total Duration: {total_duration:.2f}s
-   • 🎯 Success Rate: {(total_passed/total_tests*100):.1f}% if total_tests > 0 else "N/A"
+   • Passed: {total_passed}
+   • Failed: {total_failed}
+   • Total Duration: {total_duration:.2f}s
+   • Success Rate: {(total_passed/total_tests*100):.1f}% if total_tests > 0 else "N/A"
 
-📋 DETAILED RESULTS:
+DETAILED RESULTS:
 """)
     
     for result in results:
-        status = "✅ PASSED" if result["success"] else "❌ FAILED"
+        status = "PASSED" if result["success"] else "FAILED"
         print(f"   {status} {result['name']} ({result['duration']:.2f}s)")
     
     # Overall assessment
     if total_failed == 0:
-        print(f"\n🎉 ALL TESTS PASSED! Your application is ready for deployment.")
+        print(f"\nALL TESTS PASSED! Your application is ready for deployment.")
     else:
-        print(f"\n⚠️  {total_failed} tests failed. Please review and fix before deployment.")
+        print(f"\nWarning: {total_failed} tests failed. Please review and fix before deployment.")
     
-    print(f"\n📅 Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nCompleted: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     return total_failed == 0
 
