@@ -50,7 +50,10 @@ jobs:
     
     - name: Build application
       run: |
-        ./build_all.bat
+        echo "=== Starting build process ==="
+        .\build_all.bat
+        echo "=== Build completed ==="
+      shell: cmd
     
     - name: List build outputs
       run: |
