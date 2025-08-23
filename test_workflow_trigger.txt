@@ -1,3 +1,0 @@
-This is a test file to trigger GitHub Actions workflow.
-Created on: August 23, 2025
-Purpose: Test CI workflow trigger for pull requests
