@@ -14,6 +14,7 @@ from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
 from utils.logger import get_logger
 from utils.version import format_version_string, get_version
+from utils.receipt_database import ReceiptDatabase
 
 logger = get_logger(__name__)
 
@@ -28,7 +29,8 @@ class MainWindow:
         # Initialize components
         self.csv_handler = CSVHandler()
         self.web_client = WebClient()
-        self.processor = ReceiptProcessor(self.web_client)
+        self.database = ReceiptDatabase()
+        self.processor = ReceiptProcessor(self.web_client, self.database)
         
         # Variables
         self.csv_file_path = tk.StringVar()
@@ -163,6 +165,8 @@ class MainWindow:
         self.validate_button.pack(side=tk.LEFT, padx=(0, 5))
         
         ttk.Button(button_frame, text="Export Report", command=self._export_report).pack(side=tk.LEFT)
+        
+        ttk.Button(button_frame, text="📋 Receipt History", command=self._show_receipt_history).pack(side=tk.LEFT, padx=(5, 0))
         
         # Progress section
         progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding="5")
@@ -799,6 +803,17 @@ class MainWindow:
                 self.log("ERROR", "Failed to export report")
                 messagebox.showerror("Export Failed", "Failed to export report")
     
+    def _show_receipt_history(self):
+        """Show the receipt history dialog."""
+        try:
+            from gui.receipt_history_dialog import ReceiptHistoryDialog
+            
+            dialog = ReceiptHistoryDialog(self.root, self.database)
+            
+        except Exception as e:
+            logger.error(f"Failed to open receipt history dialog: {e}")
+            messagebox.showerror("Error", f"Failed to open receipt history:\n{str(e)}")
+
     def log(self, level: str, message: str):
         """Add a log entry to the GUI."""
         from datetime import datetime

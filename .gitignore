@@ -136,6 +136,10 @@ logs/
 *.log
 credentials
 sample/
+*.db
+*.sqlite
+*.sqlite3
+receipts_history.db
 
 # IDE files
 .vscode/

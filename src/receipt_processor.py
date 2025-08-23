@@ -10,10 +10,12 @@ import time
 try:
     from .csv_handler import ReceiptData
     from .web_client import WebClient
+    from .utils.receipt_database import ReceiptDatabase, ReceiptRecord
 except ImportError:
     # Fallback for when imported directly
     from csv_handler import ReceiptData
     from web_client import WebClient
+    from utils.receipt_database import ReceiptDatabase, ReceiptRecord
 
 try:
     from .utils.logger import get_logger
@@ -41,10 +43,12 @@ class ProcessingResult:
 class ReceiptProcessor:
     """Main processor for handling receipt issuance."""
     
-    def __init__(self, web_client: WebClient):
+    def __init__(self, web_client: WebClient, database: ReceiptDatabase = None):
         self.web_client = web_client
         self.results: List[ProcessingResult] = []
         self.dry_run = False
+        self.database = database or ReceiptDatabase()
+        self.save_to_database = True  # Option to disable database saving if needed
     
     def set_dry_run(self, dry_run: bool):
         """Enable or disable dry run mode."""
@@ -180,6 +184,12 @@ class ReceiptProcessor:
                 time.sleep(1)
         
         logger.info(f"Bulk processing completed. Success: {self._count_successful()}, Failed: {self._count_failed()}")
+        
+        # Save results to database
+        if self.save_to_database:
+            saved_count = self.save_all_results_to_database(receipts, "bulk")
+            logger.info(f"Saved {saved_count} results to database")
+        
         return self.results.copy()
     
     def process_receipts_step_by_step(self, receipts: List[ReceiptData],
@@ -345,6 +355,12 @@ class ReceiptProcessor:
                 self.results.append(result)
         
         logger.info(f"Step-by-step processing completed. Success: {self._count_successful()}, Failed: {self._count_failed()}")
+        
+        # Save results to database
+        if self.save_to_database:
+            saved_count = self.save_all_results_to_database(receipts, "step-by-step")
+            logger.info(f"Saved {saved_count} results to database")
+        
         return self.results.copy()
     
     def _process_single_receipt(self, receipt: ReceiptData, form_data: Dict = None) -> ProcessingResult:
@@ -690,6 +706,143 @@ class ReceiptProcessor:
         """Get processing results."""
         return self.results.copy()
     
+    def save_result_to_database(self, result: ProcessingResult, receipt: ReceiptData, 
+                               processing_mode: str) -> bool:
+        """Save a processing result to the database.
+        
+        Args:
+            result: ProcessingResult to save
+            receipt: Original ReceiptData that was processed
+            processing_mode: 'bulk' or 'step-by-step'
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        if not self.save_to_database:
+            return True
+        
+        try:
+            # Extract additional information if available
+            tenant_count = 1
+            landlord_count = 1
+            is_inheritance = False
+            
+            # Try to parse tenant information from tenant_name field
+            if result.tenant_name and "tenants)" in result.tenant_name:
+                import re
+                match = re.search(r'\((\d+) tenants\)', result.tenant_name)
+                if match:
+                    tenant_count = int(match.group(1))
+            
+            # Create ReceiptRecord
+            record = ReceiptRecord(
+                contract_id=result.contract_id,
+                tenant_name=result.tenant_name,
+                from_date=result.from_date,
+                to_date=result.to_date,
+                payment_date=result.payment_date,
+                value=result.value,
+                receipt_type=receipt.receipt_type,
+                receipt_number=result.receipt_number,
+                status=result.status or ('Success' if result.success else 'Failed'),
+                error_message=result.error_message,
+                timestamp=result.timestamp,
+                processing_mode=processing_mode,
+                dry_run=self.dry_run,
+                tenant_count=tenant_count,
+                landlord_count=landlord_count,
+                is_inheritance=is_inheritance
+            )
+            
+            # Save to database
+            receipt_id = self.database.add_receipt(record)
+            logger.info(f"Saved receipt result to database with ID {receipt_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save result to database: {e}")
+            return False
+    
+    def save_all_results_to_database(self, receipts: List[ReceiptData], 
+                                   processing_mode: str) -> int:
+        """Save all current results to database in batch.
+        
+        Args:
+            receipts: Original receipt data list
+            processing_mode: 'bulk' or 'step-by-step'
+            
+        Returns:
+            Number of results successfully saved
+        """
+        if not self.save_to_database:
+            return 0
+        
+        try:
+            records = []
+            
+            for result in self.results:
+                # Find corresponding receipt data
+                receipt = None
+                for r in receipts:
+                    if r.contract_id == result.contract_id:
+                        receipt = r
+                        break
+                
+                if not receipt:
+                    logger.warning(f"Could not find original receipt data for contract {result.contract_id}")
+                    continue
+                
+                # Extract additional information
+                tenant_count = 1
+                landlord_count = 1
+                is_inheritance = False
+                
+                # Try to parse tenant information from tenant_name field
+                if result.tenant_name and "tenants)" in result.tenant_name:
+                    import re
+                    match = re.search(r'\((\d+) tenants\)', result.tenant_name)
+                    if match:
+                        tenant_count = int(match.group(1))
+                
+                # Create ReceiptRecord
+                record = ReceiptRecord(
+                    contract_id=result.contract_id,
+                    tenant_name=result.tenant_name,
+                    from_date=result.from_date,
+                    to_date=result.to_date,
+                    payment_date=result.payment_date,
+                    value=result.value,
+                    receipt_type=receipt.receipt_type,
+                    receipt_number=result.receipt_number,
+                    status=result.status or ('Success' if result.success else 'Failed'),
+                    error_message=result.error_message,
+                    timestamp=result.timestamp,
+                    processing_mode=processing_mode,
+                    dry_run=self.dry_run,
+                    tenant_count=tenant_count,
+                    landlord_count=landlord_count,
+                    is_inheritance=is_inheritance
+                )
+                records.append(record)
+            
+            # Save all records in batch
+            receipt_ids = self.database.add_receipts_batch(records)
+            logger.info(f"Saved {len(receipt_ids)} receipt results to database")
+            return len(receipt_ids)
+            
+        except Exception as e:
+            logger.error(f"Failed to save results to database: {e}")
+            return 0
+    
+    def get_database(self) -> ReceiptDatabase:
+        """Get the database instance."""
+        return self.database
+    
+    def set_database_saving(self, enabled: bool):
+        """Enable or disable database saving."""
+        self.save_to_database = enabled
+        logger.info(f"Database saving: {'enabled' if enabled else 'disabled'}")
+
     def generate_report_data(self) -> List[Dict[str, Any]]:
         """Generate report data for export."""
         report_data = []
