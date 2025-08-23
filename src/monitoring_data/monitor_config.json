@@ -1,0 +1,33 @@
+{
+  "check_interval_hours": 4,
+  "critical_pages": [
+    "https://www.portaldasfinancas.gov.pt/",
+    "https://www.portaldasfinancas.gov.pt/at/html/index.html",
+    "https://servicos.portaldasfinancas.gov.pt/"
+  ],
+  "form_selectors": [
+    "form[name='loginForm']",
+    "form#loginForm",
+    "form.login-form",
+    "input[name='username']",
+    "input[name='password']",
+    "input[type='submit']"
+  ],
+  "element_selectors": {
+    "login_button": "input[type='submit'], button[type='submit']",
+    "username_field": "input[name='username'], input[id='username']",
+    "password_field": "input[name='password'], input[id='password']",
+    "error_messages": ".error, .alert-danger, .message-error",
+    "success_messages": ".success, .alert-success, .message-success",
+    "2fa_elements": "input[name*='token'], input[name*='code'], .two-factor"
+  },
+  "javascript_patterns": [
+    "function\\s+login\\s*\\(",
+    "function\\s+authenticate\\s*\\(",
+    "function\\s+submitForm\\s*\\(",
+    "ajax\\s*\\(\\s*{",
+    "\\.post\\s*\\(",
+    "fetch\\s*\\("
+  ],
+  "max_response_time_ms": 10000
+}
