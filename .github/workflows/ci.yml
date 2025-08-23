@@ -3,8 +3,8 @@ name: CI - Tests & Quality
 on:
   pull_request:
     branches: [ main, release/* ]
-  push:
-    branches: [ main, test/*, fix/*, feat/*, docs/*, release/* ]
+  #push:
+    #branches: [ main, test/*, fix/*, feat/*, docs/*, release/* ]
   workflow_dispatch:
 
 permissions:
@@ -81,26 +81,20 @@ jobs:
             ? 'All 61 unit tests completed successfully!' 
             : 'Some tests failed. Please check the workflow logs for details.';
           
-          const body = `## Test Results
-          
-**Status**: ${testStatus}
-
-<details>
-<summary>Test Details</summary>
-
-\\\`\\\`\\\`
-${testDetails}
-
-Event: ${{ github.event_name }}
-Branch: ${{ github.ref }}
-Target: ${{ github.base_ref }}
-Commit: ${{ github.sha }}
-\\\`\\\`\\\`
-
-</details>
-
----
-*Automated by GitHub Actions CI/CD Pipeline*`;
+          const body = '## Test Results\n\n' +
+            '**Status**: ' + testStatus + '\n\n' +
+            '<details>\n' +
+            '<summary>Test Details</summary>\n\n' +
+            '```\n' +
+            testDetails + '\n\n' +
+            'Event: ${{ github.event_name }}\n' +
+            'Branch: ${{ github.ref }}\n' +
+            'Target: ${{ github.base_ref }}\n' +
+            'Commit: ${{ github.sha }}\n' +
+            '```\n\n' +
+            '</details>\n\n' +
+            '---\n' +
+            '*Automated by GitHub Actions CI/CD Pipeline*';
 
           try {
             await github.rest.issues.createComment({
