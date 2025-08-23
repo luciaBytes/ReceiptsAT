@@ -14,6 +14,7 @@ from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
 from utils.logger import get_logger
 from utils.version import format_version_string, get_version
+from gui.email_config_dialog import show_email_config_dialog
 
 logger = get_logger(__name__)
 
@@ -798,6 +799,7 @@ class MainWindow:
             else:
                 self.log("ERROR", "Failed to export report")
                 messagebox.showerror("Export Failed", "Failed to export report")
+    
     
     def log(self, level: str, message: str):
         """Add a log entry to the GUI."""
