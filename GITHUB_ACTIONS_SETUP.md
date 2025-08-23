@@ -32,7 +32,7 @@ I've set up a complete CI/CD pipeline for your project with the following workfl
 
 ### Automatic Patch Bumping
 - If you merge a PR without changing `.version`, the patch number auto-increments
-- Example: `1.0.5` → `1.0.6`
+- Example: `1.0.0` → `1.0.1`
 
 ### Manual Version Control
 - Update `.version` file in your PR to set specific version

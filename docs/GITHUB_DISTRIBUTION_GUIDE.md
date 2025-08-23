@@ -223,8 +223,8 @@ Update version in these files:
 3. Test the application thoroughly
 4. Run full build: `build_all.bat`
 5. Test the installer
-6. Create Git tag: `git tag v1.0.1`
-7. Push tag: `git push origin v1.0.1`
+6. Create Git tag: `git tag v1.0.0`
+7. Push tag: `git push origin v1.0.0`
 8. Create GitHub release with installer
 
 #### Automated Release Process
@@ -238,7 +238,7 @@ Update version in these files:
 
 #### GitHub Release Template
 ```markdown
-## Portal das Finanças Receipts v1.0.1
+## Portal das Finanças Receipts v1.0.0
 
 ### New Features
 - Feature 1 description
@@ -253,7 +253,7 @@ Update version in these files:
 - Improvement 2 description
 
 ### Installation
-1. Download `PortalReceiptsApp_Setup_v1.0.1.exe` below
+1. Download `PortalReceiptsApp_Setup_v1.0.0.exe` below
 2. Run the installer as administrator
 3. Follow the setup wizard
 4. Launch from Start Menu or desktop shortcut

@@ -466,7 +466,7 @@ iscc installer_script.iss "/DMyAppVersion=%VERSION%"
 
 **Critical Implementation Details**:
 - **Unicode-Free Scripts**: All build scripts must use plain ASCII text only
-- **Version File Format**: `.version` contains single line with version number (e.g., "1.0.7")
+- **Version File Format**: `.version` contains single line with version number (e.g., "1.0.0")
 - **Windows Compatibility**: Scripts tested for cp1252 encoding compatibility
 - **Error Handling**: All scripts include error checking and status reporting
 - **Dependency Management**: Automated installation of PyInstaller and Inno Setup in CI
@@ -525,7 +525,7 @@ dist/
    - **Purpose**: Ensure code quality and comprehensive testing coverage
 
 2. **Release Automation** (`.github/workflows/release.yml`)
-   - **Trigger**: Git tags matching `v*` pattern (e.g., v1.0.7)
+   - **Trigger**: Git tags matching `v*` pattern (e.g., v1.0.0)
    - **Actions**: 
      - Run complete test suite for validation
      - Install build dependencies (PyInstaller 6.15.0, Inno Setup 6)
@@ -544,11 +544,11 @@ dist/
    - **Purpose**: Ensure build system works before merge
 
 **Dynamic Versioning System**:
-- **Version File**: `.version` contains current version (format: "1.0.7")
+- **Version File**: `.version` contains current version (format: "1.0.0")
 - **Build Integration**: All build scripts read version dynamically from `.version` file
 - **Filename Consistency**: Executables and installers named with current version
 - **Manual Control**: Update `.version` file to control release versions
-- **Tag-Based Releases**: Create git tag (e.g., `git tag v1.0.7`) to trigger automated release
+- **Tag-Based Releases**: Create git tag (e.g., `git tag v1.0.0`) to trigger automated release
 
 **Build System Integration**:
 ```batch
@@ -568,13 +568,13 @@ REM build/package_release.bat - Release packaging with version
 
 **Release Process Flow**:
 ```
-1. Update .version file (e.g., "1.0.8")
+1. Update .version file (e.g., "1.0.0")
 2. Commit changes to main branch
-3. Create and push git tag: git tag v1.0.8 && git push origin v1.0.8
+3. Create and push git tag: git tag v1.0.0 && git push origin v1.0.0
 4. GitHub Actions automatically:
    - Runs all 61 tests
    - Builds Windows executable (receipts_app.exe)
-   - Creates Inno Setup installer (PortalReceiptsApp_Setup_v1.0.8.exe)
+   - Creates Inno Setup installer (PortalReceiptsApp_Setup_v1.0.0.exe)
    - Creates GitHub release with artifacts
 5. Release ready for distribution
 ```
@@ -631,7 +631,7 @@ This Portuguese Tax Authority Receipt Automation System is **100% complete** and
 - **Build**: PyInstaller + Inno Setup for professional distribution
 
 **Ready for End Users**:
-1. Download installer from GitHub releases (`PortalReceiptsApp_Setup_v1.0.7.exe`)
+1. Download installer from GitHub releases (`PortalReceiptsApp_Setup_v1.0.0.exe`)
 2. Run installer (one-click installation)
 3. Launch application from desktop or Start menu
 4. Load CSV file with contract data
@@ -641,7 +641,7 @@ This Portuguese Tax Authority Receipt Automation System is **100% complete** and
 **Ready for Developers**:
 1. Clone repository
 2. Update `.version` file for new releases
-3. Create git tag matching version: `git tag v1.0.8 && git push origin v1.0.8`
+3. Create git tag matching version: `git tag v1.0.0 && git push origin v1.0.0`
 4. GitHub Actions automatically builds and releases
 5. Professional CI/CD pipeline manages entire workflow
 
