@@ -13,6 +13,7 @@ from csv_handler import CSVHandler
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
 from utils.logger import get_logger
+from utils.version import format_version_string, get_version
 
 logger = get_logger(__name__)
 
@@ -21,7 +22,7 @@ class MainWindow:
     
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Receipts Processor")
+        self.root.title(f"Portal Receipts v{get_version()}")
         self.root.geometry("800x600")
         
         # Initialize components
@@ -183,6 +184,14 @@ class MainWindow:
         
         self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80)
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Version info at bottom
+        version_frame = ttk.Frame(main_frame)
+        version_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+        
+        version_label = ttk.Label(version_frame, text=format_version_string(), 
+                                 font=("TkDefaultFont", 8), foreground="gray")
+        version_label.pack(side=tk.LEFT)
         
         # Don't test connection on startup - wait for user to click login
     

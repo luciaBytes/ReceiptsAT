@@ -199,6 +199,33 @@ jobs:
           echo "No releases folder found"
         }
         
+    - name: Setup Code Signing (Optional)
+      id: setup-signing
+      run: |
+        if ($env:CODE_SIGN_CERT_BASE64 -and $env:CODE_SIGN_PASSWORD) {
+          echo "Code signing credentials found - setting up certificate"
+          $certBytes = [System.Convert]::FromBase64String($env:CODE_SIGN_CERT_BASE64)
+          $certPath = "certificate.pfx"
+          [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+          echo "CODE_SIGN_CERT=$certPath" >> $env:GITHUB_ENV
+          echo "CODE_SIGN_PASSWORD=$env:CODE_SIGN_PASSWORD" >> $env:GITHUB_ENV
+          echo "signing-enabled=true" >> $env:GITHUB_OUTPUT
+        } else {
+          echo "No code signing credentials configured - builds will be unsigned"
+          echo "To enable signing, add CODE_SIGN_CERT_BASE64 and CODE_SIGN_PASSWORD secrets"
+          echo "signing-enabled=false" >> $env:GITHUB_OUTPUT
+        }
+      env:
+        CODE_SIGN_CERT_BASE64: ${{ secrets.CODE_SIGN_CERT_BASE64 }}
+        CODE_SIGN_PASSWORD: ${{ secrets.CODE_SIGN_PASSWORD }}
+        
+    - name: Code Sign Application
+      if: steps.setup-signing.outputs.signing-enabled == 'true'
+      run: |
+        echo "Code signing executables..."
+        .\build\code_sign.bat
+      shell: cmd
+        
     - name: Create GitHub Release
       id: create_release
       uses: actions/create-release@v1

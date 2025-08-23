@@ -22,7 +22,15 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [3/4] Creating installer...
+echo [3/5] Code signing...
+call "%~dp0build\code_sign.bat"
+if %ERRORLEVEL% NEQ 0 (
+    echo WARNING: Code signing failed, continuing without signatures
+    echo Set CODE_SIGN_CERT and CODE_SIGN_PASSWORD environment variables to enable signing
+)
+
+echo.
+echo [4/5] Creating installer...
 call "%~dp0build\build_installer.bat"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to create installer
@@ -30,7 +38,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [4/4] Packaging for distribution...
+echo [5/5] Packaging for distribution...
 call "%~dp0build\package_release.bat"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to package release
