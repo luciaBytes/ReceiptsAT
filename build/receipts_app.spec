@@ -37,6 +37,8 @@ a = Analysis(
         (str(project_root / 'src'), 'src'),
         # Include documentation files if they exist
         (str(project_root / 'README.md'), '.'),
+        # Include version file for runtime version detection
+        (str(project_root / '.version'), '.'),
     ],
     hiddenimports=[
         'requests',
