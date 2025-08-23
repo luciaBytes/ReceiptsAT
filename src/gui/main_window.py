@@ -12,6 +12,7 @@ from datetime import datetime
 from csv_handler import CSVHandler
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
+from gui.csv_template_dialog import show_csv_template_dialog
 from utils.logger import get_logger
 from utils.version import format_version_string, get_version
 
@@ -126,7 +127,22 @@ class MainWindow:
         ttk.Entry(csv_frame, textvariable=self.csv_file_path, state="readonly").grid(
             row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5)
         )
-        ttk.Button(csv_frame, text="Browse", command=self._browse_csv_file).grid(row=0, column=2)
+        
+        # Make buttons the same width by using a consistent width parameter
+        button_width = 18  # Increased to accommodate "Generate Template" text
+        ttk.Button(csv_frame, text="Browse", command=self._browse_csv_file, width=button_width).grid(row=0, column=2)
+        
+        # CSV Template Generator button - placed below Browse button, same width, text only
+        ttk.Button(csv_frame, text="Generate Template", command=self._generate_csv_template, width=button_width).grid(row=1, column=2, pady=(5, 0))
+        
+        # CSV help label
+        help_label = ttk.Label(
+            csv_frame, 
+            text="💡 Need help with CSV format? Use the template generator above",
+            font=("Segoe UI", 8),
+            foreground="gray"
+        )
+        help_label.grid(row=2, column=0, columnspan=3, pady=(5, 0), sticky=tk.W)
         
         # Options section
         options_frame = ttk.LabelFrame(main_frame, text="Options", padding="5")
@@ -951,6 +967,32 @@ class MainWindow:
         dialog.wait_window()
         
         return result[0]
+    
+    def _generate_csv_template(self):
+        """Open the CSV template generator dialog."""
+        try:
+            result = show_csv_template_dialog(self.root)
+            if result:
+                # Show simple success message without auto-loading option
+                if os.path.isfile(result):
+                    messagebox.showinfo(
+                        "Template Generated",
+                        f"CSV template generated successfully!\n\nFile: {os.path.basename(result)}\n\nSaved to: {os.path.dirname(result)}",
+                        parent=self.root
+                    )
+                else:
+                    messagebox.showinfo(
+                        "Templates Generated",
+                        f"CSV templates generated successfully!\n\nFolder: {result}\n\nYou can find various template types in the selected folder.",
+                        parent=self.root
+                    )
+        except Exception as e:
+            logger.error(f"Error in CSV template generator: {str(e)}")
+            messagebox.showerror(
+                "Error",
+                f"Failed to open template generator:\n\n{str(e)}",
+                parent=self.root
+            )
     
     def __del__(self):
         """Cleanup on destruction."""
