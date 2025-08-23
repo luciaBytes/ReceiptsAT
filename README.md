@@ -24,7 +24,7 @@ A Windows application for automating the issuance of rent receipts for multiple 
 
 ### For End Users (Recommended)
 Download and run the Windows installer:
-1. Get `PortalReceiptsApp_Setup_v1.0.0.exe` from your administrator
+1. Get `PortalReceiptsApp_Setup_v1.0.2.exe` from your administrator
 2. Run the installer and follow the wizard
 3. Launch from Start Menu → Portal das Finanças Receipts
 4. No Python installation required!
