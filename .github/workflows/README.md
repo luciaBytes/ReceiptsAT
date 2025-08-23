@@ -100,10 +100,10 @@ The workflows automatically handle version management:
 ### Automatic Patch Release
 1. Make any changes (no version update)
 2. Create PR with changes  
-3. Merge to main → Version auto-bumped (e.g., 1.0.5 → 1.0.6)
+3. Merge to main → Version auto-bumped (e.g., 1.0.0 → 1.0.1)
 
 ### Hotfix on Release Branch
-1. Checkout release branch: `git checkout release/v1.0.5`
+1. Checkout release branch: `git checkout release/v1.0.0`
 2. Make fixes and push
 3. Tests run automatically
 4. Create PR back to main when ready
