@@ -14,6 +14,7 @@ from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
 from utils.logger import get_logger
 from utils.version import format_version_string, get_version
+from gui.auto_updater_dialog import show_auto_updater_dialog
 
 logger = get_logger(__name__)
 
@@ -162,7 +163,9 @@ class MainWindow:
                                          command=self._validate_contracts, state="disabled")
         self.validate_button.pack(side=tk.LEFT, padx=(0, 5))
         
-        ttk.Button(button_frame, text="Export Report", command=self._export_report).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="Export Report", command=self._export_report).pack(side=tk.LEFT, padx=(0, 5))
+        
+        ttk.Button(button_frame, text="🔄 Auto-updater", command=self._show_auto_updater).pack(side=tk.LEFT)
         
         # Progress section
         progress_frame = ttk.LabelFrame(main_frame, text="Progress", padding="5")
@@ -798,6 +801,14 @@ class MainWindow:
             else:
                 self.log("ERROR", "Failed to export report")
                 messagebox.showerror("Export Failed", "Failed to export report")
+    
+    def _show_auto_updater(self):
+        """Show the auto-updater dialog."""
+        try:
+            show_auto_updater_dialog(self.root)
+        except Exception as e:
+            logger.error(f"Error showing auto-updater: {e}")
+            messagebox.showerror("Error", f"Failed to open auto-updater: {e}")
     
     def log(self, level: str, message: str):
         """Add a log entry to the GUI."""
