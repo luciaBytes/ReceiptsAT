@@ -1,0 +1,11 @@
+{
+  "enabled": false,
+  "recipients": [],
+  "daily_summary_enabled": true,
+  "weekly_summary_enabled": true,
+  "send_time_hour": 9,
+  "include_statistics": true,
+  "include_charts": true,
+  "include_csv_attachment": true,
+  "language": "pt"
+}
