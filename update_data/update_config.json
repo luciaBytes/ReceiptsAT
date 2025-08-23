@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "check_interval_hours": 24,
+  "auto_download": false,
+  "auto_install": false,
+  "notify_user": true,
+  "allow_prerelease": false,
+  "github_repo": "luciaBytes/receipts",
+  "update_branch": "main",
+  "backup_enabled": true,
+  "max_backup_count": 3
+}
