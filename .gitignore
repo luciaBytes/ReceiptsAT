@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Credentials and sensitive files
+credentials
+*.key
+*.pem
+
 # Distribution / packaging
 .Python
 build/build/
@@ -136,6 +141,7 @@ logs/
 *.log
 credentials
 sample/
+!sample/sample_receipts.csv
 
 # IDE files
 .vscode/
