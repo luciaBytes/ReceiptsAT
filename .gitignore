@@ -166,3 +166,4 @@ build/**/*.md
 *.tmp.md
 *_BACKUP_*.md
 *_TEMP_*.md
+demo_templates/
