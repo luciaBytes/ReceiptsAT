@@ -32,13 +32,20 @@ class WebClient:
         self.testing_mode = testing_mode
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'pt-PT,pt;q=0.9,en;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'pt-PT,pt;q=0.9,pt-BR;q=0.8,en;q=0.7,en-US;q=0.6,en-GB;q=0.5',
             'Accept-Encoding': 'gzip, deflate, br',
+            'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'none',
+            'sec-fetch-user': '?1',
+            'upgrade-insecure-requests': '1',
             'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'Connection': 'keep-alive'
         })
         self.authenticated = False
         self.pending_2fa = False  # Flag to track if 2FA is pending
@@ -161,10 +168,118 @@ class WebClient:
             logger.error(f"Connection test failed: {str(e)}")
             return False, str(e)
     
-    def _get_login_form_data(self) -> Optional[Dict[str, str]]:
-        """Get login form data including CSRF tokens from JavaScript SPA."""
+    def _get_csrf_token_data(self) -> Optional[Dict[str, str]]:
+        """Extract CSRF token data from login page for secure form submission."""
         try:
-            logger.info("Fetching login form data from SPA...")
+            logger.info("Extracting CSRF token data from login page...")
+            
+            response = self.session.get(self.login_page_url, timeout=10)
+            response.raise_for_status()
+            
+            import re
+            import json
+            
+            # Look for the specific CSRF object pattern found in the JavaScript
+            # Pattern: { parameterName: `_csrf`, token: `token-value` }
+            csrf_object_pattern = r'{\s*parameterName\s*:\s*`([^`]+)`\s*,\s*token\s*:\s*`([^`]+)`\s*}'
+            match = re.search(csrf_object_pattern, response.text, re.IGNORECASE | re.DOTALL)
+            
+            if match:
+                param_name = match.group(1)
+                token_value = match.group(2)
+                logger.info(f"Found CSRF object: parameterName='{param_name}', token='{token_value[:10]}...{token_value[-4:]}'")
+                return {
+                    'parameterName': param_name,
+                    'token': token_value
+                }
+            
+            # Alternative pattern with quotes instead of backticks
+            csrf_object_pattern2 = r'{\s*parameterName\s*:\s*["\']([^"\']+)["\']\s*,\s*token\s*:\s*["\']([^"\']+)["\']\s*}'
+            match = re.search(csrf_object_pattern2, response.text, re.IGNORECASE | re.DOTALL)
+            
+            if match:
+                param_name = match.group(1)
+                token_value = match.group(2)
+                logger.info(f"Found CSRF object (alt pattern): parameterName='{param_name}', token='{token_value[:10]}...{token_value[-4:]}'")
+                return {
+                    'parameterName': param_name,
+                    'token': token_value
+                }
+            
+            # Look for separate parameterName and token assignments
+            param_pattern = r'parameterName\s*:\s*[`"\']([^`"\']+)[`"\']'
+            token_pattern = r'token\s*:\s*[`"\']([^`"\']+)[`"\']'
+            
+            param_match = re.search(param_pattern, response.text, re.IGNORECASE)
+            token_match = re.search(token_pattern, response.text, re.IGNORECASE)
+            
+            if param_match and token_match:
+                param_name = param_match.group(1)
+                token_value = token_match.group(1)
+                logger.info(f"Found separate CSRF components: parameterName='{param_name}', token='{token_value[:10]}...{token_value[-4:]}'")
+                return {
+                    'parameterName': param_name,
+                    'token': token_value
+                }
+            
+            # Look for CSRF data in JSON script tags
+            script_patterns = [
+                r'<script[^>]*type=["\']application/json["\'][^>]*>([^<]+)</script>'
+            ]
+            
+            for pattern in script_patterns:
+                matches = re.findall(pattern, response.text)
+                for script_content in matches:
+                    try:
+                        data = json.loads(script_content)
+                        # Look for _csrf object in the JSON data
+                        if '_csrf' in data and isinstance(data['_csrf'], dict):
+                            csrf_data = data['_csrf']
+                            if 'parameterName' in csrf_data and 'token' in csrf_data:
+                                logger.info(f"Found CSRF in JSON script: parameterName='{csrf_data['parameterName']}', token='{csrf_data['token'][:10]}...{csrf_data['token'][-4:]}'")
+                                return csrf_data
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Fallback: Look for traditional CSRF patterns
+            csrf_token_patterns = [
+                r'<meta name="csrf-token" content="([^"]+)"',
+                r'<input[^>]+name="[^"]*csrf[^"]*"[^>]+value="([^"]+)"',
+                r'<input[^>]+value="([^"]+)"[^>]+name="[^"]*csrf[^"]*"',
+                r'"csrf[^"]*token[^"]*"\s*:\s*"([^"]+)"',
+                r'csrf_token[\'"]?\s*:\s*[\'"]([^\'"]+)[\'"]'
+            ]
+            
+            for pattern in csrf_token_patterns:
+                match = re.search(pattern, response.text, re.IGNORECASE)
+                if match:
+                    csrf_token = match.group(1)
+                    logger.info(f"Found CSRF token (fallback): {csrf_token[:10]}...{csrf_token[-4:]}")
+                    return {
+                        'parameterName': '_token',  # Default parameter name
+                        'token': csrf_token
+                    }
+            
+            # Check cookies for CSRF token
+            for cookie in self.session.cookies:
+                if 'csrf' in cookie.name.lower() or 'xsrf' in cookie.name.lower():
+                    logger.info(f"Found CSRF token in cookie: {cookie.name}")
+                    return {
+                        'parameterName': cookie.name,
+                        'token': cookie.value
+                    }
+            
+            logger.warning("No CSRF token found in page, JSON, cookies, or headers")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to extract CSRF token data: {str(e)}")
+            return None
+
+    def _get_login_form_data(self) -> Optional[Dict[str, str]]:
+        """Get login form data from the modern SPA-based authentication system."""
+        try:
+            logger.info("Fetching login form data from modern SPA...")
             
             # Make sure we visit the login page first to establish session cookies
             response = self.session.get(self.login_page_url, timeout=10)
@@ -173,46 +288,97 @@ class WebClient:
             logger.info(f"Login page response: Status {response.status_code}")
             logger.info(f"Cookies received: {[f'{c.name}={c.value[:10]}...' for c in self.session.cookies]}")
             
-            # Extract CSRF token from JavaScript (SPA renders forms dynamically)
+            # The new system uses JSON script tags for configuration instead of inline JavaScript
             import re
-            csrf_pattern = r"_csrf:\s*{\s*parameterName:\s*'([^']+)',\s*token:\s*'([^']+)'"
-            csrf_match = re.search(csrf_pattern, response.text)
+            import json
             
-            if not csrf_match:
-                logger.error("CSRF token not found in JavaScript configuration")
-                return None
+            # Extract partID from JSON data-attributes script
+            data_attr_pattern = r'<script id="data-attributes" type="application/json">([^<]+)</script>'
+            data_attr_match = re.search(data_attr_pattern, response.text)
             
-            csrf_param_name = csrf_match.group(1)
-            csrf_token = csrf_match.group(2)
-            self._csrf_token = csrf_token
+            form_data = {}
             
-            logger.info(f"Extracted CSRF token from JavaScript: {csrf_param_name}")
+            if data_attr_match:
+                try:
+                    data_attrs = json.loads(data_attr_match.group(1))
+                    if 'partID' in data_attrs:
+                        form_data['partID'] = data_attrs['partID']
+                        logger.info(f"Extracted partID from JSON: {data_attrs['partID']}")
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse data-attributes JSON")
             
-            # Extract other configuration from JavaScript
-            form_data = {
-                csrf_param_name: csrf_token
-            }
+            # Extract root-data attributes for form submission configuration
+            root_data_pattern = r'<div id="root-data"([^>]+)>'
+            root_data_match = re.search(root_data_pattern, response.text)
             
-            # Extract partID from JavaScript
-            part_id_pattern = r"partID:\s*'([^']+)'"
-            part_id_match = re.search(part_id_pattern, response.text)
-            if part_id_match:
-                form_data['partID'] = part_id_match.group(1)
-                logger.info(f"Extracted partID: {part_id_match.group(1)}")
+            if root_data_match:
+                # Extract data attributes
+                attr_text = root_data_match.group(1)
+                
+                # Parse data-submit-* attributes which indicate form submission parameters
+                data_attrs = re.findall(r'data-([^=]+)="([^"]*)"', attr_text)
+                for attr_name, attr_value in data_attrs:
+                    if attr_name.startswith('submit-nif-form-'):
+                        # These are form configuration attributes
+                        config_key = attr_name.replace('submit-nif-form-', '')
+                        if config_key == 'allow-personal-data':
+                            form_data['envioDadosPessoais'] = 'true' if attr_value.lower() == 'true' else 'false'
+                        elif config_key == 'selected-auth-method':
+                            form_data['selectedAuthMethod'] = attr_value or 'N'  # Default to NIF
+                
+                logger.info("Extracted SPA configuration from root-data attributes")
             
-            # Add other common fields that might be needed
-            form_data.update({
-                'authVersion': '2',
-                'isMultipleAuthentication': 'false'
-            })
+            # For the modern system, we need to simulate the form submission
+            # Based on real working request: partID, selectedAuthMethod, authVersion, _csrf
+            if 'partID' not in form_data:
+                form_data['partID'] = 'PFAP'  # Default value from URL parameter
+                
+            if 'selectedAuthMethod' not in form_data:
+                form_data['selectedAuthMethod'] = 'N'  # N for NIF authentication
             
-            logger.info(f"Prepared SPA form data with {len(form_data)} fields")
+            # Add authentication version (required in working request)
+            form_data['authVersion'] = '2'
+            
+            # Remove fields not present in working request
+            form_data.pop('envioDadosPessoais', None)
+            form_data.pop('isMultipleAuthentication', None)
+            
+            logger.info(f"Prepared modern SPA form data with {len(form_data)} fields")
+            logger.info(f"Form data keys: {list(form_data.keys())}")
+            
             return form_data
             
         except Exception as e:
-            logger.error(f"Failed to get SPA login form data: {str(e)}")
+            logger.error(f"Failed to get modern SPA login form data: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
+    def _establish_session(self) -> bool:
+        """Establish a proper session by visiting the Portal das Finanças first."""
+        try:
+            logger.info("Establishing session with Portal das Finanças...")
+            
+            # Visit the main portal first to establish session
+            portal_url = "https://www.portaldasfinancas.gov.pt"
+            response = self.session.get(portal_url, timeout=10)
+            response.raise_for_status()
+            
+            logger.info(f"Portal visit successful: {response.status_code}")
+            
+            # Then visit the login page to get proper cookies
+            response = self.session.get(self.login_page_url, timeout=10)
+            response.raise_for_status()
+            
+            logger.info(f"Login page visit successful: {response.status_code}")
+            logger.info(f"Session cookies: {[f'{c.name}={c.value[:10]}...' for c in self.session.cookies]}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to establish session: {str(e)}")
+            return False
+
     def login(self, username: str, password: str, sms_code: str = None) -> Tuple[bool, str]:
         """Login to Autenticação.Gov with optional 2FA SMS verification."""
         if self.login_attempts >= self.max_login_attempts:
@@ -227,6 +393,10 @@ class WebClient:
             if sms_code:
                 return self._verify_2fa_sms(sms_code)
             
+            # Establish proper session first
+            if not self._establish_session():
+                return False, "Failed to establish session with authentication server"
+            
             # Initial login attempt
             self.login_attempts += 1
             logger.info(f"Attempting login (attempt {self.login_attempts})")
@@ -236,18 +406,86 @@ class WebClient:
             if not form_data:
                 return False, "Failed to retrieve login form"
             
-            # Add credentials to form data in correct format for NIF authentication
+            # Get CSRF token data for secure submission
+            csrf_data = self._get_csrf_token_data()
+            if csrf_data:
+                form_data[csrf_data['parameterName']] = csrf_data['token']
+                logger.info(f"Added CSRF token to form data: {csrf_data['parameterName']}={csrf_data['token'][:10]}...{csrf_data['token'][-4:]}")
+            
+            # Add credentials to form data in exact format matching working request
             form_data.update({
-                'username': username,
+                'username': username,           # Should be Portuguese NIF (tax ID), not email
                 'password': password,
-                'envioDadosPessoais': 'false',  # Required from JS config
-                'selectedAuthMethod': 'N'       # N for NIF authentication
+                'selectedAuthMethod': 'N',      # N for NIF authentication  
+                'authVersion': '2'              # Required version field
             })
+            
+            # Remove fields that aren't in the working request
+            form_data.pop('envioDadosPessoais', None)
+            form_data.pop('isMultipleAuthentication', None)
             
             # Store username for potential 2FA verification
             self._current_username = username
             
             logger.info(f"Prepared login form with {len(form_data)} fields")
+            logger.info(f"Form data keys: {list(form_data.keys())}")
+            
+            # Try JSON submission first (modern approach)
+            try:
+                logger.info("Attempting JSON login submission...")
+                
+                json_headers = {
+                    'Accept': 'application/json, text/plain, */*',
+                    'Accept-Language': 'pt-PT,pt;q=0.9,en;q=0.8',
+                    'Content-Type': 'application/json',
+                    'Origin': self.auth_base_url,
+                    'Referer': self.login_page_url,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0',
+                    'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Microsoft Edge";v="138"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"'
+                }
+                
+                if csrf_data:
+                    json_headers['X-CSRF-Token'] = csrf_data['token']
+                
+                json_response = self.session.post(
+                    self.login_url,
+                    json=form_data,
+                    headers=json_headers,
+                    timeout=15,
+                    allow_redirects=False  # Handle redirects manually
+                )
+                
+                logger.info(f"JSON login response: Status {json_response.status_code}")
+                logger.info(f"JSON response content: {json_response.text[:200]}")
+                
+                if json_response.status_code == 200:
+                    logger.info("JSON login submission successful")
+                    return self._analyze_login_response(json_response)
+                elif json_response.status_code in [302, 303, 307, 308]:
+                    # Handle redirect manually
+                    redirect_url = json_response.headers.get('Location')
+                    if redirect_url:
+                        logger.info(f"Following redirect to: {redirect_url}")
+                        redirect_response = self.session.get(redirect_url, timeout=15)
+                        return self._analyze_login_response(redirect_response)
+                elif json_response.status_code == 403:
+                    if 'invalidCsrfToken' in json_response.text:
+                        logger.warning("CSRF token invalid, falling back to form submission")
+                    else:
+                        logger.warning(f"403 Forbidden: {json_response.text[:100]}")
+                    # Fall through to form submission
+                else:
+                    logger.warning(f"JSON submission failed with {json_response.status_code}: {json_response.text[:100]}")
+                    # Fall through to form submission
+                    
+            except Exception as json_error:
+                logger.warning(f"JSON submission error: {json_error}, falling back to form submission")
+            
+            # Fallback to traditional form submission
+            logger.info("Attempting traditional form submission...")
             
             # Set headers for form submission
             self._set_login_headers()
@@ -424,21 +662,15 @@ class WebClient:
         try:
             logger.info(f"Attempting 2FA SMS verification with code: {sms_code}")
             
-            # Get current CSRF token from the authentication page
-            response = self.session.get(self.login_page_url, timeout=10)
-            response.raise_for_status()
+            # Get current CSRF token using the same method as initial login
+            csrf_data = self._get_csrf_token_data()
             
-            # Extract current CSRF token
-            import re
-            csrf_pattern = r"_csrf:\s*{\s*parameterName:\s*'([^']+)',\s*token:\s*'([^']+)'"
-            csrf_match = re.search(csrf_pattern, response.text)
-            
-            if not csrf_match:
+            if not csrf_data:
                 logger.error("Could not extract CSRF token for 2FA verification")
                 return False, "Failed to get authentication token for SMS verification"
             
-            csrf_param_name = csrf_match.group(1)
-            csrf_token = csrf_match.group(2)
+            csrf_param_name = csrf_data.get('parameterName', '_csrf')
+            csrf_token = csrf_data.get('token')
             
             logger.info(f"Using CSRF token for 2FA: {csrf_param_name}")
             

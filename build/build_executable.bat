@@ -50,4 +50,3 @@ if exist "..\dist\PortalReceiptsApp\PortalReceiptsApp.exe" (
 echo.
 echo To create an installer, run: build_installer.bat
 echo.
-pause

@@ -45,4 +45,3 @@ if %ERRORLEVEL% EQU 0 (
     echo ERROR: Failed to create installer
     exit /b 1
 )
-pause
