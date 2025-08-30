@@ -473,6 +473,14 @@ class MainWindow:
         dialog = TwoFactorDialog(self.root, self._handle_2fa_code, error_message)
         dialog.show()
     
+    def _show_api_monitor(self):
+        """Show API Monitor dialog for tracking Portal das Finanças changes."""
+        try:
+            show_api_monitor_dialog(self.root)
+        except Exception as e:
+            logger.error(f"Failed to show API monitor dialog: {e}")
+            messagebox.showerror("Error", f"Could not open API Monitor: {str(e)}")
+    
     def _handle_2fa_code(self, sms_code: str):
         """Handle SMS code submission for 2FA verification."""
         if not sms_code or not sms_code.strip():
