@@ -11,6 +11,18 @@ import sys
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+# Import API monitor tests
+from test_api_monitor import (
+    TestPageSnapshot,
+    TestChangeDetection, 
+    TestMonitoringConfig,
+    TestPortalAPIMonitor
+)
+from test_api_monitor_dialog import (
+    TestAPIMonitorDialog,
+    TestAPIMonitorDialogMocked
+)
+
 from csv_handler import CSVHandler, ReceiptData
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
@@ -379,8 +391,20 @@ if __name__ == '__main__':
     # Create test suite
     test_suite = unittest.TestSuite()
     
-    # Add test classes
-    test_classes = [TestCSVHandler, TestWebClient, TestReceiptProcessor, TestIntegration]
+    # Add test classes including API Monitor tests
+    test_classes = [
+        TestCSVHandler, 
+        TestWebClient, 
+        TestReceiptProcessor, 
+        TestIntegration,
+        # API Monitor test classes
+        TestPageSnapshot,
+        TestChangeDetection,
+        TestMonitoringConfig,
+        TestPortalAPIMonitor,
+        TestAPIMonitorDialog,
+        TestAPIMonitorDialogMocked
+    ]
     
     for test_class in test_classes:
         tests = unittest.TestLoader().loadTestsFromTestCase(test_class)
