@@ -19,10 +19,14 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 # Application metadata
-APP_NAME = "Portal das Finanças Receipts"
-APP_VERSION = "1.0.0"
-APP_DESCRIPTION = "Automates rent receipt issuance through Portuguese Tax Authority"
+APP_NAME = "PortalReceiptsApp"
+APP_VERSION = "1.0.2" 
+APP_DESCRIPTION = "Portal das Finanças - Automated Receipt Processing"
 COMPANY_NAME = "LuciaBytes"
+
+# Standard paths
+DIST_PATH = project_root / 'dist'
+WORKPATH = build_dir / 'temp'  # Use temp directory that will be cleaned up
 
 # Build configuration
 block_cipher = None
@@ -30,8 +34,12 @@ block_cipher = None
 # Analysis configuration
 a = Analysis(
     [str(project_root / 'src' / 'main.py')],
-    pathex=[str(project_root)],
-    binaries=[],
+    pathex=[str(project_root), str(project_root / 'src')],
+    binaries=[
+        # Add explicit tkinter DLL paths to fix Python 3.13 issues
+        (str(Path(sys.base_exec_prefix) / 'DLLs' / 'tcl86t.dll'), '.'),
+        (str(Path(sys.base_exec_prefix) / 'DLLs' / 'tk86t.dll'), '.'),
+    ],
     datas=[
         # Include all source files to ensure proper module discovery
         (str(project_root / 'src'), 'src'),
@@ -39,6 +47,8 @@ a = Analysis(
         (str(project_root / 'README.md'), '.'),
         # Include version file for runtime version detection
         (str(project_root / '.version'), '.'),
+        # Include config directory for language settings
+        (str(project_root / 'config'), 'config'),
     ],
     hiddenimports=[
         'requests',
@@ -65,6 +75,8 @@ a = Analysis(
         'idna',
         'time',
         'queue',
+        # Add multilingual localization modules
+        'utils.multilingual_localization',
     ],
     hookspath=[],
     hooksconfig={},
@@ -80,6 +92,8 @@ a = Analysis(
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
+    workpath=str(WORKPATH),
+    distpath=str(DIST_PATH),
 )
 
 # Remove test files from datas
@@ -92,11 +106,11 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='PortalReceiptsApp',
+    name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # Disable UPX to prevent DLL issues
     console=False,  # Set to False for GUI app (no console window)
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -113,8 +127,24 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,  # Disable UPX to prevent DLL issues
     upx_exclude=[],
-    name='PortalReceiptsApp',
-    distpath=str(project_root / 'dist'),
+    name=APP_NAME,
+    distpath=str(DIST_PATH),
 )
+
+# Cleanup function to remove build artifacts after successful build
+import shutil
+import atexit
+
+def cleanup_build_artifacts():
+    """Clean up temporary build artifacts after successful build"""
+    try:
+        if WORKPATH.exists():
+            print(f"Cleaning up build artifacts from {WORKPATH}")
+            shutil.rmtree(WORKPATH)
+    except Exception as e:
+        print(f"Note: Could not clean up build artifacts: {e}")
+
+# Register cleanup to run after build completion
+atexit.register(cleanup_build_artifacts)
