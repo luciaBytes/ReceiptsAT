@@ -22,6 +22,12 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
+echo [2.1] Final cleanup of build artifacts...
+if exist "build\temp" rmdir /s /q "build\temp" >nul 2>&1
+if exist "build\receipts_app" rmdir /s /q "build\receipts_app" >nul 2>&1
+echo Build artifacts cleaned up
+
+echo.
 echo [3/5] Code signing...
 call "%~dp0build\code_sign.bat"
 if %ERRORLEVEL% NEQ 0 (

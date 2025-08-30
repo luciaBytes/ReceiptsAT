@@ -15,8 +15,7 @@ from receipt_processor import ReceiptProcessor, ProcessingResult
 from gui.csv_template_dialog import show_csv_template_dialog
 from utils.logger import get_logger
 from utils.version import format_version_string, get_version
-from utils.portuguese_localization import get_text
-from utils.multilingual_localization import switch_language, get_language_button_text
+from utils.multilingual_localization import get_text, switch_language, get_language_button_text
 
 logger = get_logger(__name__)
 
@@ -40,6 +39,10 @@ class MainWindow:
         self.progress_var = tk.DoubleVar()
         self.status_var = tk.StringVar(value=get_text('STATUS_READY'))
         self.session_monitor_id = None  # For tracking session monitoring
+        
+        # Session state tracking for proper translation updates
+        self.current_session_state = "none"  # "none", "active", "expired"
+        self.current_connection_state = "ready"  # "ready", "connecting", "connected", "error"
         
         # Setup GUI
         self._setup_gui()
@@ -65,18 +68,20 @@ class MainWindow:
         self.language_button.grid(row=0, column=1, sticky=(tk.E, tk.N), pady=(0, 10))
         
         # Login section
-        login_frame = ttk.LabelFrame(main_frame, text=get_text('AUTHENTICATION_SECTION'), padding="5")
-        login_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        login_frame.columnconfigure(1, weight=1)
+        self.login_frame = ttk.LabelFrame(main_frame, text=get_text('AUTHENTICATION_SECTION'), padding="5")
+        self.login_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.login_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(login_frame, text=get_text('USERNAME_LABEL')).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-        self.username_entry = ttk.Entry(login_frame, width=30)
+        self.username_label = ttk.Label(self.login_frame, text=get_text('USERNAME_LABEL'))
+        self.username_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.username_entry = ttk.Entry(self.login_frame, width=30)
         self.username_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
         
-        ttk.Label(login_frame, text=get_text('PASSWORD_LABEL')).grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
+        self.password_label = ttk.Label(self.login_frame, text=get_text('PASSWORD_LABEL'))
+        self.password_label.grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
         
         # Create password frame to hold entry and toggle button
-        password_frame = ttk.Frame(login_frame)
+        password_frame = ttk.Frame(self.login_frame)
         password_frame.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
         password_frame.columnconfigure(0, weight=1)
         
@@ -107,7 +112,7 @@ class MainWindow:
         self.root.bind('<Control-Shift-P>', lambda e: self._toggle_password_visibility())
         
         # Login and Logout buttons frame 
-        buttons_frame = ttk.Frame(login_frame)
+        buttons_frame = ttk.Frame(self.login_frame)
         buttons_frame.grid(row=0, column=2, rowspan=2, padx=(5, 0))
         
         self.login_button = ttk.Button(buttons_frame, text=get_text('LOGIN_BUTTON'), command=self._login)
@@ -116,58 +121,59 @@ class MainWindow:
         self.logout_button = ttk.Button(buttons_frame, text=get_text('LOGOUT_BUTTON'), command=self._logout, state="disabled")
         self.logout_button.grid(row=1, column=0)
         
-        self.connection_status = ttk.Label(login_frame, text=get_text('CONNECTION_STATUS_READY'), foreground="blue")
+        self.connection_status = ttk.Label(self.login_frame, text=get_text('CONNECTION_STATUS_READY'), foreground="blue")
         self.connection_status.grid(row=2, column=0, columnspan=3, pady=(5, 0))
         
         # Add session status information
-        self.session_status = ttk.Label(login_frame, text=get_text('SESSION_STATUS_NONE'), foreground="gray")
+        self.session_status = ttk.Label(self.login_frame, text=get_text('SESSION_STATUS_NONE'), foreground="gray")
         self.session_status.grid(row=3, column=0, columnspan=3, pady=(2, 0))
         
         # Remove the authentication info label since we have tooltips now
         
         # CSV file section
-        csv_frame = ttk.LabelFrame(main_frame, text=get_text('CSV_FILE_SECTION'), padding="5")
-        csv_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        csv_frame.columnconfigure(1, weight=1)
+        self.csv_frame = ttk.LabelFrame(main_frame, text=get_text('CSV_FILE_SECTION'), padding="5")
+        self.csv_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.csv_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(csv_frame, text=get_text('FILE_LABEL')).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-        ttk.Entry(csv_frame, textvariable=self.csv_file_path, state="readonly").grid(
+        self.file_label = ttk.Label(self.csv_frame, text=get_text('FILE_LABEL'))
+        self.file_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Entry(self.csv_frame, textvariable=self.csv_file_path, state="readonly").grid(
             row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5)
         )
         
         # Make buttons the same width by using a consistent width parameter
         button_width = 18  # Increased to accommodate "Generate Template" text
-        ttk.Button(csv_frame, text=get_text('BROWSE_BUTTON'), command=self._browse_csv_file, width=button_width).grid(row=0, column=2)
+        self.browse_button = ttk.Button(self.csv_frame, text=get_text('BROWSE_BUTTON'), command=self._browse_csv_file, width=button_width)
+        self.browse_button.grid(row=0, column=2)
         
         # CSV Template Generator button - placed below Browse button, same width, text only
-        ttk.Button(csv_frame, text=get_text('GENERATE_TEMPLATE_BUTTON'), command=self._generate_csv_template, width=button_width).grid(row=1, column=2, pady=(5, 0))
+        self.generate_template_button = ttk.Button(self.csv_frame, text=get_text('GENERATE_TEMPLATE_BUTTON'), command=self._generate_csv_template, width=button_width)
+        self.generate_template_button.grid(row=1, column=2, pady=(5, 0))
         
         # CSV help label
-        help_label = ttk.Label(
-            csv_frame, 
-            text="💡 Need help with CSV format? Use the template generator above",
+        self.help_label = ttk.Label(
+            self.csv_frame, 
+            text=get_text('CSV_HELP_TEXT'),
             font=("Segoe UI", 8),
             foreground="gray"
         )
-        help_label.grid(row=2, column=0, columnspan=3, pady=(5, 0), sticky=tk.W)
+        self.help_label.grid(row=2, column=0, columnspan=3, pady=(5, 0), sticky=tk.W)
         
         # Options section
-        options_frame = ttk.LabelFrame(main_frame, text=get_text('OPTIONS_SECTION'), padding="5")
-        options_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.options_frame = ttk.LabelFrame(main_frame, text=get_text('OPTIONS_SECTION'), padding="5")
+        self.options_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
         
         # Processing mode
-        ttk.Label(options_frame, text=get_text('MODE_LABEL')).grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
-        ttk.Radiobutton(options_frame, text=get_text('BULK_MODE'), variable=self.mode_var, value="bulk").grid(
-            row=0, column=1, sticky=tk.W
-        )
-        ttk.Radiobutton(options_frame, text=get_text('STEP_BY_STEP_MODE'), variable=self.mode_var, value="step").grid(
-            row=0, column=2, sticky=tk.W, padx=(10, 0)
-        )
+        self.mode_label = ttk.Label(self.options_frame, text=get_text('MODE_LABEL'))
+        self.mode_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        self.bulk_mode_radio = ttk.Radiobutton(self.options_frame, text=get_text('BULK_MODE'), variable=self.mode_var, value="bulk")
+        self.bulk_mode_radio.grid(row=0, column=1, sticky=tk.W)
+        self.step_mode_radio = ttk.Radiobutton(self.options_frame, text=get_text('STEP_BY_STEP_MODE'), variable=self.mode_var, value="step")
+        self.step_mode_radio.grid(row=0, column=2, sticky=tk.W, padx=(10, 0))
         
         # Dry run option
-        ttk.Checkbutton(options_frame, text=get_text('TESTING_MODE'), variable=self.dry_run_var).grid(
-            row=1, column=0, columnspan=3, sticky=tk.W, pady=(5, 0)
-        )
+        self.testing_mode_checkbox = ttk.Checkbutton(self.options_frame, text=get_text('TESTING_MODE'), variable=self.dry_run_var)
+        self.testing_mode_checkbox.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(5, 0))
         
         # Control buttons
         button_frame = ttk.Frame(main_frame)
@@ -185,27 +191,28 @@ class MainWindow:
                                          command=self._validate_contracts, state="disabled")
         self.validate_button.pack(side=tk.LEFT, padx=(0, 5))
         
-        ttk.Button(button_frame, text=get_text('EXPORT_RESULTS_BUTTON'), command=self._export_report).pack(side=tk.LEFT)
+        self.export_results_button = ttk.Button(button_frame, text=get_text('EXPORT_RESULTS_BUTTON'), command=self._export_report)
+        self.export_results_button.pack(side=tk.LEFT)
         
         # Progress section
-        progress_frame = ttk.LabelFrame(main_frame, text=get_text('STATUS_SECTION'), padding="5")
-        progress_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        progress_frame.columnconfigure(0, weight=1)
+        self.progress_frame = ttk.LabelFrame(main_frame, text=get_text('STATUS_SECTION'), padding="5")
+        self.progress_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.progress_frame.columnconfigure(0, weight=1)
         
-        self.progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var, maximum=100)
+        self.progress_bar = ttk.Progressbar(self.progress_frame, variable=self.progress_var, maximum=100)
         self.progress_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         
-        status_label = ttk.Label(progress_frame, textvariable=self.status_var)
+        status_label = ttk.Label(self.progress_frame, textvariable=self.status_var)
         status_label.grid(row=1, column=0, sticky=tk.W)
         
         # Log section
-        log_frame = ttk.LabelFrame(main_frame, text=get_text('LOG_SECTION'), padding="5")
-        log_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
+        self.log_frame = ttk.LabelFrame(main_frame, text=get_text('LOG_SECTION'), padding="5")
+        self.log_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.log_frame.columnconfigure(0, weight=1)
+        self.log_frame.rowconfigure(0, weight=1)
         main_frame.rowconfigure(6, weight=1)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80)
+        self.log_text = scrolledtext.ScrolledText(self.log_frame, height=10, width=80)
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Version info at bottom
@@ -272,7 +279,7 @@ class MainWindow:
                 
         except Exception as e:
             logger.error(f"Failed to switch language: {e}")
-            messagebox.showerror("Error", f"Failed to switch language: {e}")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('LANGUAGE_SWITCH_FAILED_MESSAGE').format(error=str(e)))
     
     def _refresh_interface_text(self):
         """Refresh all interface text elements with current language."""
@@ -290,14 +297,50 @@ class MainWindow:
             self.stop_button.config(text=get_text('CANCEL_BUTTON'))
             self.validate_button.config(text=get_text('VALIDATE_CONTRACTS_BUTTON'))
             
-            # Update status labels
-            self.connection_status.config(text=get_text('CONNECTION_STATUS_READY'))
-            self.session_status.config(text=get_text('SESSION_STATUS_NONE'))
+            # Update status labels based on stored state
+            if self.current_session_state == "active":
+                self.session_status.config(text=get_text('SESSION_STATUS_ACTIVE'))
+            elif self.current_session_state == "expired":
+                self.session_status.config(text=get_text('SESSION_STATUS_EXPIRED'))
+            else:
+                self.session_status.config(text=get_text('SESSION_STATUS_NONE'))
+                
+            if self.current_connection_state == "ready":
+                self.connection_status.config(text=get_text('CONNECTION_STATUS_READY'))
+            elif self.current_connection_state == "connecting":
+                self.connection_status.config(text=get_text('CONNECTION_STATUS_CONNECTING'))
+            elif self.current_connection_state == "connected":
+                self.connection_status.config(text=get_text('CONNECTION_STATUS_CONNECTED'))
+            elif self.current_connection_state == "error":
+                self.connection_status.config(text=get_text('CONNECTION_STATUS_ERROR'))
+                
             self.status_var.set(get_text('STATUS_READY'))
             
-            # Note: LabelFrame texts and other static texts would require recreating the frames
-            # For now, we'll just update the dynamic elements. Full interface refresh would
-            # require a more complex reconstruction of the GUI elements.
+            # Update frame titles
+            self.login_frame.config(text=get_text('AUTHENTICATION_SECTION'))
+            self.csv_frame.config(text=get_text('CSV_FILE_SECTION'))
+            self.options_frame.config(text=get_text('OPTIONS_SECTION'))
+            self.progress_frame.config(text=get_text('STATUS_SECTION'))
+            self.log_frame.config(text=get_text('LOG_SECTION'))
+            
+            # Update buttons with new language
+            self.browse_button.config(text=get_text('BROWSE_BUTTON'))
+            self.generate_template_button.config(text=get_text('GENERATE_TEMPLATE_BUTTON'))
+            self.export_results_button.config(text=get_text('EXPORT_RESULTS_BUTTON'))
+            
+            # Update field labels
+            self.username_label.config(text=get_text('USERNAME_LABEL'))
+            self.password_label.config(text=get_text('PASSWORD_LABEL'))
+            self.file_label.config(text=get_text('FILE_LABEL'))
+            self.mode_label.config(text=get_text('MODE_LABEL'))
+            
+            # Update radio buttons and checkbox
+            self.bulk_mode_radio.config(text=get_text('BULK_MODE'))
+            self.step_mode_radio.config(text=get_text('STEP_BY_STEP_MODE'))
+            self.testing_mode_checkbox.config(text=get_text('TESTING_MODE'))
+            
+            # Update help text
+            self.help_label.config(text=get_text('CSV_HELP_TEXT'))
             
         except Exception as e:
             logger.error(f"Failed to refresh interface text: {e}")
@@ -350,7 +393,7 @@ class MainWindow:
         password = self.password_entry.get()
         
         if not username or not password:
-            messagebox.showerror("Error", "Please enter username and password")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('ENTER_USERNAME_PASSWORD_MESSAGE'))
             return
         
         def login():
@@ -365,6 +408,11 @@ class MainWindow:
             self.root.after(0, lambda: self._handle_login_result(success, message))
         
         self.login_button.config(state="disabled")
+        
+        # Update state variables
+        self.current_connection_state = "connecting"
+        
+        # Update UI elements
         self.connection_status.config(text="Connecting...", foreground="orange")
         self.log("INFO", "Testing connection and attempting login...")
         threading.Thread(target=login, daemon=True).start()
@@ -372,16 +420,27 @@ class MainWindow:
     def _handle_connection_error(self, error_message):
         """Handle connection error."""
         self.login_button.config(state="normal")
+        
+        # Update state variables
+        self.current_connection_state = "error"
+        self.current_session_state = "none"
+        
+        # Update UI elements
         self.connection_status.config(text=f"Connection failed: {error_message}", foreground="red")
-        self.session_status.config(text="No active session", foreground="gray")
+        self.session_status.config(text=get_text('SESSION_STATUS_NONE'), foreground="gray")
         self.log("ERROR", f"Connection failed: {error_message}")
-        messagebox.showerror("Connection Failed", f"Could not connect to authentication server:\n{error_message}")
+        messagebox.showerror(get_text('CONNECTION_FAILED_TITLE'), get_text('CONNECTION_FAILED_MESSAGE').format(error=error_message))
     
     def _handle_login_result(self, success: bool, message: str):
         """Handle login result."""
         self.login_button.config(state="normal")
         
         if success:
+            # Update state variables
+            self.current_connection_state = "connected" 
+            self.current_session_state = "active"
+            
+            # Update UI elements
             self.connection_status.config(text=get_text('STATUS_AUTHENTICATED'), foreground="green")
             self.session_status.config(text=get_text('SESSION_STATUS_ACTIVE'), foreground="green")
             self.log("INFO", "Login successful")
@@ -417,12 +476,12 @@ class MainWindow:
             self.connection_status.config(text="No SMS sends remaining", foreground="red")
             self.session_status.config(text="Wait or use alternative auth", foreground="red")
             self.log("ERROR", "2FA verification failed - no SMS sends remaining")
-            messagebox.showerror("2FA Error", "Não há mais envios de SMS disponíveis. Aguarde ou use autenticação alternativa.")
+            messagebox.showerror(get_text('TWO_FA_ERROR_TITLE'), get_text('SMS_LIMIT_REACHED_MESSAGE'))
         else:
             self.connection_status.config(text="Authentication failed", foreground="red")
             self.session_status.config(text="No active session", foreground="gray")
             self.log("ERROR", f"Login failed: {message}")
-            messagebox.showerror("Login Failed", message)
+            messagebox.showerror(get_text('LOGIN_FAILED_TITLE'), message)
     
     def _logout(self):
         """Handle logout button click."""
@@ -444,6 +503,11 @@ class MainWindow:
     def _handle_logout_result(self, success: bool, message: str):
         """Handle logout result."""
         if success:
+            # Update state variables
+            self.current_connection_state = "ready"
+            self.current_session_state = "none"
+            
+            # Update UI elements
             self.connection_status.config(text="Logged out", foreground="gray")
             self.session_status.config(text="No active session", foreground="gray")
             self.log("INFO", "Logout successful")
@@ -463,7 +527,7 @@ class MainWindow:
         else:
             self.logout_button.config(state="normal")
             self.log("ERROR", f"Logout failed: {message}")
-            messagebox.showerror("Logout Failed", message)
+            messagebox.showerror(get_text('LOGOUT_FAILED_TITLE'), message)
 
     def _show_2fa_dialog(self, error_message: str = None):
         """Show 2FA SMS verification dialog."""
@@ -473,7 +537,7 @@ class MainWindow:
     def _handle_2fa_code(self, sms_code: str):
         """Handle SMS code submission for 2FA verification."""
         if not sms_code or not sms_code.strip():
-            messagebox.showerror("Error", "Please enter the SMS verification code")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('ENTER_SMS_CODE_MESSAGE'))
             return
         
         def verify_2fa():
@@ -487,6 +551,11 @@ class MainWindow:
     def _handle_2fa_result(self, success: bool, message: str):
         """Handle 2FA verification result."""
         if success:
+            # Update state variables
+            self.current_connection_state = "connected"
+            self.current_session_state = "active"
+            
+            # Update UI elements
             self.connection_status.config(text=get_text('STATUS_AUTHENTICATED'), foreground="green")
             self.session_status.config(text=get_text('SESSION_STATUS_ACTIVE'), foreground="green")
             self.log("INFO", "2FA verification successful")
@@ -503,7 +572,7 @@ class MainWindow:
             self.connection_status.config(text="2FA verification failed", foreground="red")
             self.session_status.config(text="No active session", foreground="gray")
             self.log("ERROR", f"2FA verification failed: {message}")
-            messagebox.showerror("2FA Verification Failed", f"SMS verification failed:\n{message}")
+            messagebox.showerror(get_text('TWO_FA_VERIFICATION_FAILED_TITLE'), get_text('SMS_VERIFICATION_FAILED_MESSAGE').format(message=message))
             
             # Re-enable login button for retry
             self.login_button.config(state="normal")
@@ -517,8 +586,10 @@ class MainWindow:
         
         if file_path:
             self.csv_file_path.set(file_path)
-            self._validate_csv_file(file_path)
+            # Update button states immediately after file selection
             self._update_start_button_state()
+            # Start validation in background
+            self._validate_csv_file(file_path)
     
     def _validate_csv_file(self, file_path: str):
         """Validate the selected CSV file."""
@@ -539,22 +610,31 @@ class MainWindow:
             self.log("ERROR", "CSV validation failed:")
             for error in errors:
                 self.log("ERROR", f"  {error}")
-            messagebox.showerror("CSV Validation Failed", "\n".join(errors[:10]))
+            messagebox.showerror(get_text('CSV_VALIDATION_FAILED_TITLE'), "\n".join(errors[:10]))
     
     def _update_start_button_state(self):
         """Update the state of the start and validate buttons."""
         has_auth = self.web_client.is_authenticated()
-        has_csv = self.csv_file_path.get() and self.csv_handler.get_receipts()
-        session_ok = "expired" not in self.session_status.cget("text").lower()
+        has_csv_file = bool(self.csv_file_path.get())  # Just need a file path
+        receipts = self.csv_handler.get_receipts()
+        has_valid_receipts = has_csv_file and bool(receipts)  # Need validated receipts
         
-        # Enable start button only if fully ready
-        if has_auth and has_csv and session_ok:
+        # Debug logging
+        self.log("DEBUG", f"Button state check: auth={has_auth}, csv_file={has_csv_file}, receipts_count={len(receipts) if receipts else 0}")
+        
+        # Check session status more reliably by looking at both authentication and session text
+        session_text = self.session_status.cget("text").lower()
+        session_ok = has_auth and "expired" not in session_text and "no active" not in session_text
+        
+        # Enable start button only if fully ready (authenticated, valid CSV with receipts, session OK)
+        if has_auth and has_valid_receipts and session_ok:
             self.start_button.config(state="normal")
         else:
             self.start_button.config(state="disabled")
         
-        # Enable validate button if authenticated and has CSV (even without full validation)
-        if has_auth and has_csv:
+        # Enable validate button if authenticated and has CSV file (even without validation)
+        # This allows users to validate contracts as soon as they login and select a file
+        if has_auth and has_csv_file and session_ok:
             self.validate_button.config(state="normal")
         else:
             self.validate_button.config(state="disabled")
@@ -562,12 +642,12 @@ class MainWindow:
     def _validate_contracts(self):
         """Validate CSV contract IDs against Portal das Finanças."""
         if not self.web_client.is_authenticated():
-            messagebox.showerror("Error", "Please login first")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('PLEASE_LOGIN_FIRST_MESSAGE'))
             return
         
         receipts = self.csv_handler.get_receipts()
         if not receipts:
-            messagebox.showerror("Error", "Please load a valid CSV file first")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('LOAD_VALID_CSV_FIRST_MESSAGE'))
             return
         
         def validate():
@@ -654,7 +734,7 @@ class MainWindow:
         self.validate_button.config(state="normal")
         self.status_var.set("Contract validation failed")
         self.log("ERROR", f"Contract validation error: {error_message}")
-        messagebox.showerror("Validation Error", f"Contract validation failed:\n{error_message}")
+        messagebox.showerror(get_text('VALIDATION_ERROR_TITLE'), get_text('CONTRACT_VALIDATION_FAILED_MESSAGE').format(error=error_message))
 
     def _start_processing(self):
         """Start receipt processing."""
@@ -663,7 +743,7 @@ class MainWindow:
         
         receipts = self.csv_handler.get_receipts()
         if not receipts:
-            messagebox.showerror("Error", "No valid receipts to process")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('NO_VALID_RECEIPTS_MESSAGE'))
             return
         
         # Set dry run mode
@@ -795,9 +875,9 @@ class MainWindow:
         summary_message = f"Processing completed.\n{chr(10).join(summary_parts)}"
         
         if failed > 0:
-            messagebox.showwarning("Processing Complete", summary_message)
+            messagebox.showwarning(get_text('PROCESSING_COMPLETE_TITLE'), summary_message)
         else:
-            messagebox.showinfo("Processing Complete", summary_message)
+            messagebox.showinfo(get_text('PROCESSING_COMPLETE_TITLE'), summary_message)
     
     def _processing_error(self, error_message: str):
         """Handle processing error."""
@@ -806,14 +886,19 @@ class MainWindow:
         
         # Check if error is session-related
         if any(keyword in error_message.lower() for keyword in ['session', 'expired', 'authentication', 'login']):
-            self.session_status.config(text="Session expired", foreground="red")
-            self.connection_status.config(text="Session expired", foreground="orange")
+            # Update state variables
+            self.current_session_state = "expired"
+            self.current_connection_state = "error"
+            
+            # Update UI elements  
+            self.session_status.config(text=get_text('SESSION_STATUS_EXPIRED'), foreground="red")
+            self.connection_status.config(text=get_text('SESSION_STATUS_EXPIRED'), foreground="orange")
         
         # Update UI
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
         
-        messagebox.showerror("Processing Error", error_message)
+        messagebox.showerror(get_text('PROCESSING_ERROR_TITLE'), error_message)
     
     def _processing_stopped(self):
         """Handle processing stop."""
@@ -843,7 +928,7 @@ class MainWindow:
         """Export processing report."""
         results = self.processor.get_results()
         if not results:
-            messagebox.showinfo(get_text('DIALOG_INFORMATION_TITLE'), "Nenhum resultado de processamento para exportar")
+            messagebox.showinfo(get_text('INFORMATION_TITLE'), get_text('NO_PROCESSING_RESULTS_EXPORT_MESSAGE'))
             return
         
         file_path = filedialog.asksaveasfilename(
@@ -858,10 +943,10 @@ class MainWindow:
             
             if success:
                 self.log("INFO", f"Report exported to: {file_path}")
-                messagebox.showinfo("Export Successful", f"Report exported to:\n{file_path}")
+                messagebox.showinfo(get_text('EXPORT_SUCCESSFUL_TITLE'), get_text('REPORT_EXPORTED_TO_MESSAGE').format(path=file_path))
             else:
                 self.log("ERROR", "Failed to export report")
-                messagebox.showerror("Export Failed", "Failed to export report")
+                messagebox.showerror(get_text('EXPORT_FAILED_TITLE'), get_text('EXPORT_REPORT_FAILED_MESSAGE'))
     
     def log(self, level: str, message: str):
         """Add a log entry to the GUI."""
@@ -900,46 +985,46 @@ class MainWindow:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Receipt information
-        info_frame = ttk.LabelFrame(main_frame, text="Receipt Information", padding="10")
+        info_frame = ttk.LabelFrame(main_frame, text=get_text('RECEIPT_INFORMATION_SECTION'), padding="10")
         info_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Display receipt details
-        ttk.Label(info_frame, text=f"Contract ID: {receipt_data.contract_id}").pack(anchor=tk.W)
-        ttk.Label(info_frame, text=f"Period: {receipt_data.from_date} to {receipt_data.to_date}").pack(anchor=tk.W)
+        ttk.Label(info_frame, text=get_text('CONTRACT_ID_LABEL').format(id=receipt_data.contract_id)).pack(anchor=tk.W)
+        ttk.Label(info_frame, text=get_text('PERIOD_LABEL').format(from_date=receipt_data.from_date, to_date=receipt_data.to_date)).pack(anchor=tk.W)
         
         # Show payment date with indication if it was defaulted
         if hasattr(receipt_data, 'payment_date_defaulted') and receipt_data.payment_date_defaulted:
-            payment_date_text = f"Payment Date: {receipt_data.payment_date} (defaulted to end date)"
+            payment_date_text = get_text('PAYMENT_DATE_DEFAULTED_LABEL').format(date=receipt_data.payment_date)
             payment_label = ttk.Label(info_frame, text=payment_date_text, foreground='orange')
         else:
-            payment_date_text = f"Payment Date: {receipt_data.payment_date}"
+            payment_date_text = get_text('PAYMENT_DATE_LABEL').format(date=receipt_data.payment_date)
             payment_label = ttk.Label(info_frame, text=payment_date_text)
         payment_label.pack(anchor=tk.W)
         
         # Show value with indication if it was defaulted or missing
         if hasattr(receipt_data, 'value_defaulted') and receipt_data.value_defaulted:
-            value_text = f"Value: €{receipt_data.value:.2f} (defaulted from contract)"
+            value_text = get_text('VALUE_DEFAULTED_LABEL').format(value=receipt_data.value)
             value_label = ttk.Label(info_frame, text=value_text, foreground='orange')
         elif receipt_data.value == 0.0:
-            value_text = f"Value: €{receipt_data.value:.2f} (not specified in CSV)"
+            value_text = get_text('VALUE_NOT_SPECIFIED_LABEL').format(value=receipt_data.value)
             value_label = ttk.Label(info_frame, text=value_text, foreground='red')
         else:
-            value_text = f"Value: €{receipt_data.value:.2f}"
+            value_text = get_text('VALUE_LABEL').format(value=receipt_data.value)
             value_label = ttk.Label(info_frame, text=value_text)
         value_label.pack(anchor=tk.W)
         
         # Show receipt type with indication if it was defaulted
         if hasattr(receipt_data, 'receipt_type_defaulted') and receipt_data.receipt_type_defaulted:
-            receipt_type_text = f"Receipt Type: {receipt_data.receipt_type} (defaulted)"
+            receipt_type_text = get_text('RECEIPT_TYPE_DEFAULTED_LABEL').format(type=receipt_data.receipt_type)
             receipt_type_label = ttk.Label(info_frame, text=receipt_type_text, foreground='orange')
         else:
-            receipt_type_text = f"Receipt Type: {receipt_data.receipt_type}"
+            receipt_type_text = get_text('RECEIPT_TYPE_LABEL').format(type=receipt_data.receipt_type)
             receipt_type_label = ttk.Label(info_frame, text=receipt_type_text)
         receipt_type_label.pack(anchor=tk.W)
         
         # Contract information (if available)
         if form_data and not form_data.get('mock'):
-            contract_frame = ttk.LabelFrame(main_frame, text="Contract Information", padding="10")
+            contract_frame = ttk.LabelFrame(main_frame, text=get_text('CONTRACT_INFORMATION_SECTION'), padding="10")
             contract_frame.pack(fill=tk.X, pady=(0, 10))
             
             # Extract tenant info for display
@@ -1184,7 +1269,7 @@ class ValidationResultDialog:
         """Export validation results - same functionality as main window export."""
         # Check if there's data to export (same check as main window)
         if not self.validation_report:
-            messagebox.showinfo("No Data", "No validation results to export")
+            messagebox.showinfo(get_text('NO_DATA_TITLE'), get_text('NO_VALIDATION_RESULTS_EXPORT_MESSAGE'))
             return
         
         # Use same file dialog as main window
@@ -1202,9 +1287,9 @@ class ValidationResultDialog:
             success = self.csv_handler.export_report(report_data, file_path)
             
             if success:
-                messagebox.showinfo("Export Successful", f"Report exported to:\n{file_path}")
+                messagebox.showinfo(get_text('EXPORT_SUCCESSFUL_TITLE'), get_text('REPORT_EXPORTED_TO_MESSAGE').format(path=file_path))
             else:
-                messagebox.showerror("Export Failed", "Failed to export report")
+                messagebox.showerror(get_text('EXPORT_FAILED_TITLE'), get_text('EXPORT_REPORT_FAILED_MESSAGE'))
     
     def _generate_validation_report_data(self):
         """Generate report data for validation results in same format as main window."""
@@ -1356,11 +1441,11 @@ class TwoFactorDialog:
         sms_code = self.sms_entry.get().strip()
         
         if not sms_code:
-            messagebox.showerror(get_text('DIALOG_ERROR_TITLE'), "Por favor, introduza o codigo de verificacao SMS")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('ENTER_SMS_CODE_MESSAGE'))
             return
         
         if not sms_code.isdigit() or len(sms_code) != 6:
-            messagebox.showerror(get_text('DIALOG_ERROR_TITLE'), "O codigo SMS deve ter 6 digitos")
+            messagebox.showerror(get_text('ERROR_TITLE'), get_text('SMS_CODE_SIX_DIGITS_MESSAGE'))
             return
         
         self.dialog.destroy()

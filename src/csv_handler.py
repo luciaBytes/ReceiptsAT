@@ -70,10 +70,16 @@ class CSVHandler:
             self.column_mapping.clear()
             
             with open(file_path, 'r', encoding='utf-8') as file:
-                # Try to detect dialect
+                # Try to detect dialect, with fallback to standard comma-separated
                 sample = file.read(1024)
                 file.seek(0)
-                dialect = csv.Sniffer().sniff(sample)
+                
+                try:
+                    dialect = csv.Sniffer().sniff(sample, delimiters=',;\t')
+                except csv.Error:
+                    # Fallback to standard CSV dialect if detection fails
+                    logger.warning("Could not detect CSV dialect, using default comma-separated format")
+                    dialect = csv.excel  # Standard comma-separated
                 
                 reader = csv.DictReader(file, dialect=dialect)
                 

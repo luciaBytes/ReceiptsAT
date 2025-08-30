@@ -81,7 +81,7 @@ class MultilingualTexts:
     
     # Authentication section
     AUTHENTICATION_SECTION = {
-        "pt": "Autenticacao",
+        "pt": "Autenticação",
         "en": "Authentication"
     }
     USERNAME_LABEL = {
@@ -117,15 +117,15 @@ class MultilingualTexts:
         "en": "Connection error"
     }
     SESSION_STATUS_NONE = {
-        "pt": "Sem sessao ativa",
+        "pt": "Sem sessão ativa",
         "en": "No active session"
     }
     SESSION_STATUS_ACTIVE = {
-        "pt": "Sessao ativa",
+        "pt": "Sessão ativa",
         "en": "Active session"
     }
     SESSION_STATUS_EXPIRED = {
-        "pt": "Sessao expirada",
+        "pt": "Sessão expirada",
         "en": "Session expired"
     }
     
@@ -241,6 +241,18 @@ class MultilingualTexts:
         "pt": "Cancelar",
         "en": "Cancel"
     }
+    OK_BUTTON = {
+        "pt": "OK",
+        "en": "OK"
+    }
+    VERIFY_BUTTON = {
+        "pt": "Verificar",
+        "en": "Verify"
+    }
+    EXPORT_REPORT_BUTTON = {
+        "pt": "Exportar Relatorio",
+        "en": "Export Report"
+    }
     
     # ==============================================
     # VALIDATION DIALOG INTERFACE
@@ -253,6 +265,274 @@ class MultilingualTexts:
     VALIDATION_SUMMARY = {
         "pt": "RESUMO DA VALIDACAO (Apenas Contratos Ativos)\nContratos ativos no portal: {portal_count}\nContratos no CSV: {csv_count}\nCorrespondencias validas: {valid_count}",
         "en": "VALIDATION SUMMARY (Active Contracts Only)\nActive contracts in portal: {portal_count}\nContracts in CSV: {csv_count}\nValid matches: {valid_count}"
+    }
+    
+    # ==============================================
+    # FILE DIALOGS
+    # ==============================================
+    
+    SELECT_CSV_FILE_TITLE = {
+        "pt": "Selecionar Ficheiro CSV",
+        "en": "Select CSV File"
+    }
+    SAVE_EXPORT_FILE_TITLE = {
+        "pt": "Guardar Ficheiro de Exportacao",
+        "en": "Save Export File"
+    }
+    CSV_FILE_FILTER = {
+        "pt": "Ficheiros CSV (*.csv)",
+        "en": "CSV Files (*.csv)"
+    }
+    ALL_FILES_FILTER = {
+        "pt": "Todos os Ficheiros (*.*)",
+        "en": "All Files (*.*)"
+    }
+    
+    # ==============================================
+    # DIALOG AND FRAME SECTIONS
+    # ==============================================
+    
+    RECEIPT_INFORMATION_SECTION = {
+        "pt": "Informacao do Recibo",
+        "en": "Receipt Information"
+    }
+    
+    CONTRACT_INFORMATION_SECTION = {
+        "pt": "Informacao do Contrato",
+        "en": "Contract Information"
+    }
+    
+    ACTION_SECTION = {
+        "pt": "Acao",
+        "en": "Action"
+    }
+    
+    LOG_SECTION = {
+        "pt": "Registo",
+        "en": "Log"
+    }
+    
+    # Help and field labels
+    CSV_HELP_TEXT = {
+        "pt": "💡 Precisa de ajuda com formato CSV? Use o gerador de template acima",
+        "en": "💡 Need help with CSV format? Use the template generator above"
+    }
+    
+    CONTRACT_ID_LABEL = {
+        "pt": "ID do Contrato: {id}",
+        "en": "Contract ID: {id}"
+    }
+    
+    PERIOD_LABEL = {
+        "pt": "Periodo: {from_date} a {to_date}",
+        "en": "Period: {from_date} to {to_date}"
+    }
+    
+    PAYMENT_DATE_LABEL = {
+        "pt": "Data de Pagamento: {date}",
+        "en": "Payment Date: {date}"
+    }
+    
+    PAYMENT_DATE_DEFAULTED_LABEL = {
+        "pt": "Data de Pagamento: {date} (predefinida para data final)",
+        "en": "Payment Date: {date} (defaulted to end date)"
+    }
+    
+    VALUE_LABEL = {
+        "pt": "Valor: €{value:.2f}",
+        "en": "Value: €{value:.2f}"
+    }
+    
+    VALUE_DEFAULTED_LABEL = {
+        "pt": "Valor: €{value:.2f} (predefinido do contrato)",
+        "en": "Value: €{value:.2f} (defaulted from contract)"
+    }
+    
+    VALUE_NOT_SPECIFIED_LABEL = {
+        "pt": "Valor: €{value:.2f} (nao especificado no CSV)",
+        "en": "Value: €{value:.2f} (not specified in CSV)"
+    }
+    
+    RECEIPT_TYPE_LABEL = {
+        "pt": "Tipo de Recibo: {type}",
+        "en": "Receipt Type: {type}"
+    }
+    
+    RECEIPT_TYPE_DEFAULTED_LABEL = {
+        "pt": "Tipo de Recibo: {type} (predefinido)",
+        "en": "Receipt Type: {type} (defaulted)"
+    }
+    
+    # ==============================================
+    # DIALOG MESSAGES
+    # ==============================================
+    
+    # Dialog Titles
+    ERROR_TITLE = {
+        "pt": "Erro",
+        "en": "Error"
+    }
+    
+    CONNECTION_FAILED_TITLE = {
+        "pt": "Falha de Ligacao",
+        "en": "Connection Failed"
+    }
+    
+    LOGIN_FAILED_TITLE = {
+        "pt": "Falha no Login",
+        "en": "Login Failed"
+    }
+    
+    LOGOUT_FAILED_TITLE = {
+        "pt": "Falha no Logout",
+        "en": "Logout Failed"
+    }
+    
+    TWO_FA_ERROR_TITLE = {
+        "pt": "Erro de 2FA",
+        "en": "2FA Error"
+    }
+    
+    TWO_FA_VERIFICATION_FAILED_TITLE = {
+        "pt": "Falha na Verificacao 2FA",
+        "en": "2FA Verification Failed"
+    }
+    
+    CSV_VALIDATION_FAILED_TITLE = {
+        "pt": "Falha na Validacao CSV",
+        "en": "CSV Validation Failed"
+    }
+    
+    VALIDATION_ERROR_TITLE = {
+        "pt": "Erro de Validacao",
+        "en": "Validation Error"
+    }
+    
+    PROCESSING_ERROR_TITLE = {
+        "pt": "Erro de Processamento",
+        "en": "Processing Error"
+    }
+    
+    PROCESSING_COMPLETE_TITLE = {
+        "pt": "Processamento Completo",
+        "en": "Processing Complete"
+    }
+    
+    EXPORT_FAILED_TITLE = {
+        "pt": "Falha na Exportacao",
+        "en": "Export Failed"
+    }
+    
+    EXPORT_SUCCESSFUL_TITLE = {
+        "pt": "Exportacao Bem-sucedida",
+        "en": "Export Successful"
+    }
+    
+    INFORMATION_TITLE = {
+        "pt": "Informacao",
+        "en": "Information"
+    }
+    
+    NO_DATA_TITLE = {
+        "pt": "Sem Dados",
+        "en": "No Data"
+    }
+    
+    # Dialog Messages
+    LANGUAGE_SWITCH_FAILED_MESSAGE = {
+        "pt": "Falha ao mudar idioma: {error}",
+        "en": "Failed to switch language: {error}"
+    }
+    
+    ENTER_USERNAME_PASSWORD_MESSAGE = {
+        "pt": "Por favor, introduza o nome de utilizador e palavra-passe",
+        "en": "Please enter username and password"
+    }
+    
+    CONNECTION_FAILED_MESSAGE = {
+        "pt": "Nao foi possivel ligar ao servidor de autenticacao:\n{error}",
+        "en": "Could not connect to authentication server:\n{error}"
+    }
+    
+    SMS_LIMIT_REACHED_MESSAGE = {
+        "pt": "Nao ha mais envios de SMS disponiveis. Aguarde ou use autenticacao alternativa.",
+        "en": "No more SMS sends available. Wait or use alternative authentication."
+    }
+    
+    # Two-Factor Authentication Dialog
+    TWO_FACTOR_TITLE = {
+        "pt": "Verificacao SMS",
+        "en": "SMS Verification"
+    }
+    
+    TWO_FACTOR_MESSAGE = {
+        "pt": "Foi enviado um codigo de verificacao por SMS. Por favor, introduza o codigo de 6 digitos recebido.",
+        "en": "A verification code has been sent by SMS. Please enter the 6-digit code received."
+    }
+    
+    SMS_CODE_LABEL = {
+        "pt": "Codigo SMS:",
+        "en": "SMS Code:"
+    }
+    
+    TWO_FACTOR_HELP = {
+        "pt": "Se nao recebeu o SMS, aguarde alguns minutos ou contacte o suporte.",
+        "en": "If you didn't receive the SMS, wait a few minutes or contact support."
+    }
+    
+    ENTER_SMS_CODE_MESSAGE = {
+        "pt": "Por favor, introduza o codigo de verificacao SMS",
+        "en": "Please enter the SMS verification code"
+    }
+    
+    SMS_CODE_SIX_DIGITS_MESSAGE = {
+        "pt": "O codigo SMS deve ter 6 digitos",
+        "en": "SMS code must be 6 digits"
+    }
+    
+    SMS_VERIFICATION_FAILED_MESSAGE = {
+        "pt": "Falha na verificacao SMS:\n{message}",
+        "en": "SMS verification failed:\n{message}"
+    }
+    
+    PLEASE_LOGIN_FIRST_MESSAGE = {
+        "pt": "Por favor, faca login primeiro",
+        "en": "Please login first"
+    }
+    
+    LOAD_VALID_CSV_FIRST_MESSAGE = {
+        "pt": "Por favor, carregue primeiro um ficheiro CSV valido",
+        "en": "Please load a valid CSV file first"
+    }
+    
+    CONTRACT_VALIDATION_FAILED_MESSAGE = {
+        "pt": "Falha na validacao do contrato:\n{error}",
+        "en": "Contract validation failed:\n{error}"
+    }
+    
+    NO_VALID_RECEIPTS_MESSAGE = {
+        "pt": "Nenhum recibo valido para processar",
+        "en": "No valid receipts to process"
+    }
+    
+    NO_PROCESSING_RESULTS_EXPORT_MESSAGE = {
+        "pt": "Nenhum resultado de processamento para exportar",
+        "en": "No processing results to export"
+    }
+    
+    EXPORT_REPORT_FAILED_MESSAGE = {
+        "pt": "Falha ao exportar relatorio",
+        "en": "Failed to export report"
+    }
+    
+    REPORT_EXPORTED_TO_MESSAGE = {
+        "pt": "Relatorio exportado para:\n{path}",
+        "en": "Report exported to:\n{path}"
+    }
+    
+    NO_VALIDATION_RESULTS_EXPORT_MESSAGE = {
+        "pt": "Nenhum resultado de validacao para exportar",
+        "en": "No validation results to export"
     }
 
 # Initialize language preference on module load

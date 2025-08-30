@@ -87,7 +87,7 @@ Example:
 ```csv
 contractId,fromDate,toDate,receiptType,value
 123456,2024-01-01,2024-01-31,rent,100.00
-789012,2024-02-01,2024-02-29,rent,900.50
+789012,2024-02-01,2024-02-29,rent,
 ```
 
 ### Processing Modes

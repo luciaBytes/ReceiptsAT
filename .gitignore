@@ -14,6 +14,7 @@ credentials
 # Distribution / packaging
 .Python
 build/build/
+build/temp/
 releases/
 develop-eggs/
 dist/
