@@ -25,31 +25,39 @@ if exist "%BUILD_DIR%..\dist" (
 )
 
 echo.
-echo 2. Activating virtual environment and checking PyInstaller...
-rem Check if virtual environment exists
-if not exist "%BUILD_DIR%..\.venv\Scripts\python.exe" (
-    echo    Virtual environment not found at %BUILD_DIR%..\.venv\
-    echo    Please ensure the virtual environment is created
-    exit /b 1
+echo 2. Checking PyInstaller installation...
+rem Check if virtual environment exists, otherwise use system Python
+if exist "%BUILD_DIR%..\.venv\Scripts\python.exe" (
+    echo    Using virtual environment at %BUILD_DIR%..\.venv\
+    set "PYTHON_EXE=%BUILD_DIR%..\.venv\Scripts\python.exe"
+    set "PIP_EXE=%BUILD_DIR%..\.venv\Scripts\pip.exe"
+) else (
+    echo    Virtual environment not found, using system Python
+    set "PYTHON_EXE=python"
+    set "PIP_EXE=pip"
 )
 
-rem Use virtual environment's pip
-"%BUILD_DIR%..\.venv\Scripts\pip.exe" show pyinstaller >nul 2>&1
+rem Check if PyInstaller is installed
+%PIP_EXE% show pyinstaller >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo    Installing PyInstaller in virtual environment...
-    "%BUILD_DIR%..\.venv\Scripts\pip.exe" install pyinstaller
+    echo    Installing PyInstaller...
+    %PIP_EXE% install pyinstaller
+    if %ERRORLEVEL% NEQ 0 (
+        echo    ERROR: Failed to install PyInstaller
+        exit /b 1
+    )
 ) else (
-    echo    PyInstaller already installed in virtual environment
+    echo    PyInstaller is already installed
 )
 
 echo.
-echo 3. Building executable with virtual environment...
+echo 3. Building executable...
 cd /d "%BUILD_DIR%.."
 echo    Working directory: %cd%
 echo    Spec file: build/receipts_app.spec
-echo    Using Python: .venv\Scripts\python.exe
+echo    Using Python: %PYTHON_EXE%
 
-".venv\Scripts\python.exe" -m PyInstaller build/receipts_app.spec --noconfirm --clean
+%PYTHON_EXE% -m PyInstaller build/receipts_app.spec --noconfirm --clean
 
 echo.
 echo 4. Verifying build results...
