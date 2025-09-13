@@ -1085,10 +1085,11 @@ class ValidationResultDialog:
         lines = []
         
         # Header summary
-        lines.append(f"📊 {get_text('VALIDATION_SUMMARY', 
-                                   portal_count=self.validation_report.get('portal_contracts_count', 0),
-                                   csv_count=self.validation_report.get('csv_contracts_count', 0),
-                                   valid_count=len(self.validation_report.get('valid_contracts', [])))}")
+        validation_summary = get_text('VALIDATION_SUMMARY', 
+                                    portal_count=self.validation_report.get('portal_contracts_count', 0),
+                                    csv_count=self.validation_report.get('csv_contracts_count', 0),
+                                    valid_count=len(self.validation_report.get('valid_contracts', [])))
+        lines.append(f"{validation_summary}")
         
         # Valid contracts
         if self.validation_report.get('valid_contracts_data'):

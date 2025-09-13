@@ -51,7 +51,13 @@ jobs:
         Get-ChildItem -Path "tests" -Name "*.py" | ForEach-Object { echo "  - $_" }
         echo "=== Executing test runner ==="
         python scripts/run_tests.py
-        echo "=== Unit tests completed successfully ==="
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) {
+          echo "=== Unit tests completed successfully ==="
+        } else {
+          echo "=== Unit tests FAILED with exit code: $exitCode ==="
+          exit $exitCode
+        }
         
     - name: Test import structure
       run: |
