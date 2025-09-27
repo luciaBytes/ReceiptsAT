@@ -5,6 +5,7 @@ Main window GUI for the receipts application.
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
+import logging
 from typing import Dict, Any, List
 import os
 from datetime import datetime
@@ -12,7 +13,7 @@ from datetime import datetime
 from csv_handler import CSVHandler
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor, ProcessingResult
-from gui.csv_template_dialog import show_csv_template_dialog
+# Removed CSV template dialog import - replaced with pre-filled CSV generation
 from utils.logger import get_logger
 from utils.version import format_version_string, get_version
 from utils.multilingual_localization import get_text, switch_language, get_language_button_text
@@ -59,10 +60,15 @@ class MainWindow:
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
         
-        # Language selection button in top-right corner of main window
-        self.language_button = ttk.Button(main_frame, text=get_language_button_text(), 
+        # Language selection frame
+        lang_frame = ttk.Frame(main_frame)
+        lang_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        lang_frame.columnconfigure(0, weight=1)
+        
+        # Language selection button in top-right corner
+        self.language_button = ttk.Button(lang_frame, text=get_language_button_text(), 
                                          command=self._switch_language, width=3)
-        self.language_button.grid(row=0, column=1, sticky=(tk.E, tk.N), pady=(0, 10))
+        self.language_button.grid(row=0, column=1, sticky=tk.E)
         
         # Login section
         login_frame = ttk.LabelFrame(main_frame, text=get_text('AUTHENTICATION_SECTION'), padding="5")
@@ -136,20 +142,20 @@ class MainWindow:
         )
         
         # Make buttons the same width by using a consistent width parameter
-        button_width = 18  # Increased to accommodate "Generate Template" text
+        button_width = 18  # Consistent width for buttons
         ttk.Button(csv_frame, text=get_text('BROWSE_BUTTON'), command=self._browse_csv_file, width=button_width).grid(row=0, column=2)
         
-        # CSV Template Generator button - placed below Browse button, same width, text only
-        ttk.Button(csv_frame, text=get_text('GENERATE_TEMPLATE_BUTTON'), command=self._generate_csv_template, width=button_width).grid(row=1, column=2, pady=(5, 0))
+        # Pre-filled CSV Generator button - replaces template generator
+        ttk.Button(csv_frame, text="Get Pre-filled List", command=self._generate_prefilled_csv, width=button_width).grid(row=1, column=2, pady=(5, 0))
         
         # CSV help label
         help_label = ttk.Label(
             csv_frame, 
-            text="💡 Need help with CSV format? Use the template generator above",
+            text="💡 Get a pre-filled CSV with current contracts and rent values",
             font=("Segoe UI", 8),
             foreground="gray"
         )
-        help_label.grid(row=2, column=0, columnspan=3, pady=(5, 0), sticky=tk.W)
+        help_label.grid(row=1, column=0, columnspan=3, pady=(5, 0), sticky=tk.W)
         
         # Options section
         options_frame = ttk.LabelFrame(main_frame, text=get_text('OPTIONS_SECTION'), padding="5")
@@ -165,7 +171,7 @@ class MainWindow:
         )
         
         # Dry run option
-        ttk.Checkbutton(options_frame, text=get_text('TESTING_MODE'), variable=self.dry_run_var).grid(
+        ttk.Checkbutton(options_frame, text="🎭 Dry Run (Real Data, No Submit)", variable=self.dry_run_var).grid(
             row=1, column=0, columnspan=3, sticky=tk.W, pady=(5, 0)
         )
         
@@ -263,6 +269,10 @@ class MainWindow:
             self.password_entry.config(show="")
             self.toggle_password_btn.config(text="🙈")
             self.password_visible = True
+    
+
+    
+
     
     def _switch_language(self):
         """Switch between Portuguese and English languages."""
@@ -914,60 +924,109 @@ class MainWindow:
         info_frame = ttk.LabelFrame(main_frame, text="Receipt Information", padding="10")
         info_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Display receipt details
-        ttk.Label(info_frame, text=f"Contract ID: {receipt_data.contract_id}").pack(anchor=tk.W)
-        ttk.Label(info_frame, text=f"Period: {receipt_data.from_date} to {receipt_data.to_date}").pack(anchor=tk.W)
+        # Create a frame for contract ID
+        contract_frame = ttk.Frame(info_frame)
+        contract_frame.pack(fill=tk.X, pady=2)
         
-        # Show payment date with indication if it was defaulted
-        if hasattr(receipt_data, 'payment_date_defaulted') and receipt_data.payment_date_defaulted:
-            payment_date_text = f"Payment Date: {receipt_data.payment_date} (defaulted to end date)"
-            payment_label = ttk.Label(info_frame, text=payment_date_text, foreground='orange')
-        else:
-            payment_date_text = f"Payment Date: {receipt_data.payment_date}"
-            payment_label = ttk.Label(info_frame, text=payment_date_text)
-        payment_label.pack(anchor=tk.W)
+        # Contract ID with selectable text
+        ttk.Label(contract_frame, text="Contract ID:").pack(side=tk.LEFT)
+        contract_var = tk.StringVar(value=str(receipt_data.contract_id))
+        contract_entry = ttk.Entry(contract_frame, textvariable=contract_var, state='readonly', width=15)
+        contract_entry.pack(side=tk.LEFT, padx=(5, 5))
         
-        # Show value with indication if it was defaulted or missing
+        # Period information (selectable)
+        period_frame = ttk.Frame(info_frame)
+        period_frame.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(period_frame, text="Period:").pack(side=tk.LEFT)
+        period_text = f"{receipt_data.from_date} to {receipt_data.to_date}"
+        period_var = tk.StringVar(value=period_text)
+        period_entry = ttk.Entry(period_frame, textvariable=period_var, state='readonly', width=25)
+        period_entry.pack(side=tk.LEFT, padx=(5, 5))
+        
+        # Payment date
+        payment_frame = ttk.Frame(info_frame)
+        payment_frame.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(payment_frame, text="Payment Date:").pack(side=tk.LEFT)
+        payment_var = tk.StringVar(value=str(receipt_data.payment_date))
+        payment_entry = ttk.Entry(payment_frame, textvariable=payment_var, state='readonly', width=12)
+        payment_entry.pack(side=tk.LEFT, padx=(5, 5))
+        
+        # Payment date is now required - no defaulted indicator needed
+        
+        # Value
+        value_frame = ttk.Frame(info_frame)
+        value_frame.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+        value_text = f"€{receipt_data.value:.2f}"
+        value_var = tk.StringVar(value=value_text)
+        value_entry = ttk.Entry(value_frame, textvariable=value_var, state='readonly', width=12)
+        value_entry.pack(side=tk.LEFT, padx=(5, 5))
+        
+        # Show value status indicators
         if hasattr(receipt_data, 'value_defaulted') and receipt_data.value_defaulted:
-            value_text = f"Value: €{receipt_data.value:.2f} (defaulted from contract)"
-            value_label = ttk.Label(info_frame, text=value_text, foreground='orange')
+            ttk.Label(value_frame, text="(defaulted from contract)", foreground='orange').pack(side=tk.LEFT)
         elif receipt_data.value == 0.0:
-            value_text = f"Value: €{receipt_data.value:.2f} (not specified in CSV)"
-            value_label = ttk.Label(info_frame, text=value_text, foreground='red')
-        else:
-            value_text = f"Value: €{receipt_data.value:.2f}"
-            value_label = ttk.Label(info_frame, text=value_text)
-        value_label.pack(anchor=tk.W)
+            ttk.Label(value_frame, text="(not specified in CSV)", foreground='red').pack(side=tk.LEFT)
         
-        # Show receipt type with indication if it was defaulted
+        # Receipt type
+        receipt_type_frame = ttk.Frame(info_frame)
+        receipt_type_frame.pack(fill=tk.X, pady=2)
+        
+        ttk.Label(receipt_type_frame, text="Receipt Type:").pack(side=tk.LEFT)
+        receipt_type_var = tk.StringVar(value=str(receipt_data.receipt_type))
+        receipt_type_entry = ttk.Entry(receipt_type_frame, textvariable=receipt_type_var, state='readonly', width=12)
+        receipt_type_entry.pack(side=tk.LEFT, padx=(5, 5))
+        
+        # Show receipt type status indicator
         if hasattr(receipt_data, 'receipt_type_defaulted') and receipt_data.receipt_type_defaulted:
-            receipt_type_text = f"Receipt Type: {receipt_data.receipt_type} (defaulted)"
-            receipt_type_label = ttk.Label(info_frame, text=receipt_type_text, foreground='orange')
-        else:
-            receipt_type_text = f"Receipt Type: {receipt_data.receipt_type}"
-            receipt_type_label = ttk.Label(info_frame, text=receipt_type_text)
-        receipt_type_label.pack(anchor=tk.W)
+            ttk.Label(receipt_type_frame, text="(defaulted)", foreground='orange').pack(side=tk.LEFT)
         
         # Contract information (if available)
         if form_data and not form_data.get('mock'):
-            contract_frame = ttk.LabelFrame(main_frame, text="Contract Information", padding="10")
-            contract_frame.pack(fill=tk.X, pady=(0, 10))
+            contract_info_frame = ttk.LabelFrame(main_frame, text="Contract Information", padding="10")
+            contract_info_frame.pack(fill=tk.X, pady=(0, 10))
             
-            # Extract tenant info for display
+            # Extract contract info for display
             contract_details = form_data.get('contract_details', {})
             tenants = contract_details.get('locatarios', [])
             landlords = contract_details.get('locadores', [])
             
             if tenants:
                 tenant_names = [t.get('nome', 'Unknown') for t in tenants]
-                ttk.Label(contract_frame, text=f"Tenants: {', '.join(tenant_names)}").pack(anchor=tk.W)
+                tenant_text = ', '.join(tenant_names)
+                
+                tenant_frame = ttk.Frame(contract_info_frame)
+                tenant_frame.pack(fill=tk.X, pady=2)
+                
+                ttk.Label(tenant_frame, text="Tenants:").pack(side=tk.LEFT)
+                tenant_var = tk.StringVar(value=tenant_text)
+                tenant_entry = ttk.Entry(tenant_frame, textvariable=tenant_var, state='readonly', width=40)
+                tenant_entry.pack(side=tk.LEFT, padx=(5, 5))
             
             if landlords:
                 landlord_names = [l.get('nome', 'Unknown') for l in landlords]
-                ttk.Label(contract_frame, text=f"Landlords: {', '.join(landlord_names)}").pack(anchor=tk.W)
+                landlord_text = ', '.join(landlord_names)
+                
+                landlord_frame = ttk.Frame(contract_info_frame)
+                landlord_frame.pack(fill=tk.X, pady=2)
+                
+                ttk.Label(landlord_frame, text="Landlords:").pack(side=tk.LEFT)
+                landlord_var = tk.StringVar(value=landlord_text)
+                landlord_entry = ttk.Entry(landlord_frame, textvariable=landlord_var, state='readonly', width=40)
+                landlord_entry.pack(side=tk.LEFT, padx=(5, 5))
             
             property_address = contract_details.get('property_address', 'Not available')
-            ttk.Label(contract_frame, text=f"Property: {property_address}").pack(anchor=tk.W)
+            if property_address != 'Not available':
+                property_frame = ttk.Frame(contract_info_frame)
+                property_frame.pack(fill=tk.X, pady=2)
+                
+                ttk.Label(property_frame, text="Property:").pack(side=tk.LEFT)
+                property_var = tk.StringVar(value=property_address)
+                property_entry = ttk.Entry(property_frame, textvariable=property_var, state='readonly', width=40)
+                property_entry.pack(side=tk.LEFT, padx=(5, 5))
         
         # Question frame
         question_frame = ttk.LabelFrame(main_frame, text=get_text('ACTION_SECTION'), padding="10")
@@ -1027,32 +1086,106 @@ class MainWindow:
         
         return result[0]
     
-    def _generate_csv_template(self):
-        """Open the CSV template generator dialog."""
+    def _generate_prefilled_csv(self):
+        """Generate a pre-filled CSV with current contracts and rent values."""
         try:
-            result = show_csv_template_dialog(self.root)
-            if result:
-                # Show simple success message without auto-loading option
-                if os.path.isfile(result):
-                    messagebox.showinfo(
-                        "Template Generated",
-                        f"CSV template generated successfully!\n\nFile: {os.path.basename(result)}\n\nSaved to: {os.path.dirname(result)}",
-                        parent=self.root
-                    )
+            # Check if we have an authenticated web client
+            if not hasattr(self, 'web_client') or not self.web_client.authenticated:
+                messagebox.showwarning(
+                    "Authentication Required",
+                    "Please log in to Portal das Finanças first to generate a pre-filled CSV.",
+                    parent=self.root
+                )
+                return
+            
+            # Ask user to select save directory
+            from tkinter import filedialog
+            save_directory = filedialog.askdirectory(
+                title="Select Directory to Save Pre-filled CSV",
+                parent=self.root
+            )
+            
+            # If user cancels directory selection, return
+            if not save_directory:
+                return
+            
+            # Show progress dialog
+            progress_dialog = tk.Toplevel(self.root)
+            progress_dialog.title("Generating Pre-filled CSV")
+            progress_dialog.geometry("400x100")
+            progress_dialog.resizable(False, False)
+            progress_dialog.transient(self.root)
+            progress_dialog.grab_set()
+            
+            # Center the dialog
+            progress_dialog.update_idletasks()
+            x = (progress_dialog.winfo_screenwidth() - progress_dialog.winfo_width()) // 2
+            y = (progress_dialog.winfo_screenheight() - progress_dialog.winfo_height()) // 2
+            progress_dialog.geometry(f"+{x}+{y}")
+            
+            progress_label = ttk.Label(
+                progress_dialog,
+                text="Fetching contracts and rent values from Portal das Finanças...\n(This may take a few minutes)",
+                font=("Segoe UI", 10),
+                anchor='center'
+            )
+            progress_label.pack(expand=True)
+            
+            progress_bar = ttk.Progressbar(progress_dialog, mode='indeterminate')
+            progress_bar.pack(pady=10, padx=20, fill='x')
+            progress_bar.start()
+            
+            progress_dialog.update()
+            
+            # Generate the pre-filled CSV with user-selected directory
+            success, result = self.web_client.generate_prefilled_csv(save_directory=save_directory)
+            
+            # Close progress dialog
+            progress_bar.stop()
+            progress_dialog.destroy()
+            
+            if success:
+                # Show detailed success message with file location
+                import os
+                file_directory = os.path.dirname(result)
+                load_csv = messagebox.askyesno(
+                    "CSV Generated Successfully",
+                    f"Pre-filled CSV generated successfully!\n\n" +
+                    f"📄 File: {os.path.basename(result)}\n" +
+                    f"📁 Location: {file_directory}\n\n" +
+                    f"The file contains contracts with current rent values from Portal das Finanças.\n\n" +
+                    f"Would you like to load this CSV file now?",
+                    parent=self.root
+                )
+                
+                if load_csv:
+                    # Load the generated CSV
+                    self.csv_file_path.set(result)
+                    self._validate_csv_file(result)
                 else:
+                    # Show file location for later access
                     messagebox.showinfo(
-                        "Templates Generated",
-                        f"CSV templates generated successfully!\n\nFolder: {result}\n\nYou can find various template types in the selected folder.",
+                        "File Saved",
+                        f"Your pre-filled CSV has been saved to:\n\n{result}\n\n" +
+                        f"You can find it in: {file_directory}",
                         parent=self.root
                     )
+            else:
+                messagebox.showerror(
+                    "Error",
+                    f"Failed to generate pre-filled CSV:\n\n{result}",
+                    parent=self.root
+                )
+                
         except Exception as e:
-            logger.error(f"Error in CSV template generator: {str(e)}")
+            logger.error(f"Error in pre-filled CSV generator: {str(e)}")
             messagebox.showerror(
-                "Error",
-                f"Failed to open template generator:\n\n{str(e)}",
+                "Error", 
+                f"Failed to generate pre-filled CSV:\n\n{str(e)}",
                 parent=self.root
             )
     
+
     def __del__(self):
         """Cleanup on destruction."""
         if hasattr(self, 'web_client'):

@@ -294,7 +294,7 @@ def test_payload_validation():
         mock_session.cookies.keys.return_value = ['JSESSIONID']
         
         # Create and configure web client
-        web_client = WebClient(testing_mode=False)
+        web_client = WebClient()  # No testing_mode parameter needed
         web_client.session = mock_session
         web_client.authenticated = True
         

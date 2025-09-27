@@ -195,17 +195,17 @@ class CSVHandler:
                 # Parse provided value
                 value = float(value_str.replace(',', '.'))
             else:
-                # Use fallback value of 0.0 - will be filled from contract data later
-                value = 0.0
+                # Use fallback value - will be filled from contract data later
+                # Use -1.0 to indicate missing value (easier to detect than 0.0)
+                value = -1.0
                 value_defaulted = True
             
-            # Handle payment date (optional - defaults to to_date if not provided)
+            # Handle payment date
             payment_date = get_mapped_value('paymentDate')
             payment_date_defaulted = False
             if not payment_date:
-                # Default to end date of the rental period if not provided
-                payment_date = get_mapped_value('toDate')
-                payment_date_defaulted = True
+                # Payment date is required - raise error
+                raise ValueError(f"Row {row_num}: Payment date is required but missing")
             
             # Handle receipt type (optional - defaults to 'rent' if not provided)
             receipt_type = get_mapped_value('receiptType')
@@ -271,11 +271,14 @@ class CSVHandler:
                 f"Row {receipt.row_number}: Invalid date format. Use YYYY-MM-DD. Error: {str(e)}"
             )
         
-        # Validate value (allow 0.0 as fallback, but negative values are invalid)
-        if receipt.value < 0:
+        # Validate value (allow -1.0 as fallback indicator, but other negative values are invalid)
+        if receipt.value < 0 and receipt.value != -1.0:
             self.validation_errors.append(
                 f"Row {receipt.row_number}: Value cannot be negative (got {receipt.value})"
             )
+        elif receipt.value == 0.0 and not receipt.value_defaulted:
+            # Warn about explicit zero values (might be intentional but unusual)
+            logger.warning(f"Row {receipt.row_number}: Value is 0.0 - verify this is intentional")
         
         # Validate receipt type
         if not receipt.receipt_type:

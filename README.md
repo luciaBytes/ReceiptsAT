@@ -24,7 +24,7 @@ A Windows application for automating the issuance of rent receipts for multiple 
 
 ### For End Users (Recommended)
 Download and run the Windows installer:
-1. Get `PortalReceiptsApp_Setup_v1.0.2.exe` from your administrator
+1. Get `PortalReceiptsApp_Setup_v1.1.7.exe` from your administrator
 2. Run the installer and follow the wizard
 3. Launch from Start Menu → Portal das Finanças Receipts
 4. No Python installation required!
@@ -97,30 +97,13 @@ contractId,fromDate,toDate,receiptType,value
 
 ### Dry Run Mode
 
-Enable dry run mode to test the process without making actual web requests. This is useful for:
+Enable dry run mode to test the process without making actual receipt submissions. This is useful for:
 - Testing CSV file validation
-- Verifying the processing flow
+- Verifying the processing flow  
 - Training users on the application
+- Getting real contract data for testing purposes
 
-### Testing Mode
-
-For development and testing purposes, the WebClient can be initialized with `testing_mode=True`. This enables:
-- **Mock Authentication**: Use test credentials (`test/test`, `demo/demo`, or `admin/admin`)
-- **Simulated Connections**: Mock responses without actual network requests
-- **Sample Data**: Pre-configured test contracts and receipts
-- **No External Dependencies**: Tests run without internet connection
-
-Example usage:
-```python
-from web_client import WebClient
-
-# Production mode (default)
-client = WebClient()
-
-# Testing mode
-test_client = WebClient(testing_mode=True)
-success, message = test_client.login("test", "test")  # Mock login
-```
+Dry run mode uses real API calls to retrieve contract information and rent values, but blocks the actual receipt submission step.
 
 ## Testing
 
@@ -130,7 +113,13 @@ cd tests
 python test_suite.py
 ```
 
-The test suite uses testing mode automatically to ensure tests run quickly and reliably without external dependencies.
+The test suite includes comprehensive testing of:
+- Authentication workflows
+- CSV processing and validation
+- Receipt processing logic
+- GUI functionality
+- Error handling
+- Dry run capabilities
 
 ## Project Structure
 
@@ -140,7 +129,7 @@ recibos/
 │   ├── main.py              # Application entry point
 │   ├── csv_handler.py       # CSV processing logic
 │   ├── web_client.py        # Web requests and session management
-│   ├── receipt_processor.py # Main business logic
+│   ├── receipt_processor.py # Main business logic with dry run support
 │   ├── gui/
 │   │   ├── main_window.py   # GUI implementation
 │   │   └── __init__.py
@@ -160,10 +149,22 @@ recibos/
 
 The application uses the following endpoints (configured in `web_client.py`):
 - Base URL: `https://imoveis.portaldasfinancas.gov.pt`
-- Contracts list: `/arrendamento/consultarElementosContratos/locador`
-- Receipt form: `/arrendamento/criarRecibo/<contractId>`
-- Issue receipt: `/arrendamento/api/emitirRecibo`
-- Receipt details: `/arrendamento/detalheRecibo/<contractId>/<numReceipt>`
+- **Authentication**: `https://www.acesso.gov.pt/v2/loginForm?partID=SICI&path=/arrendamento/consultarElementosContratos/locador`
+- **Primary Contracts API**: `/arrendamento/api/obterElementosContratosEmissaoRecibos/locador` (JSON with `valorRenda`)
+  - **Parameters**: `?contractId={contract_id}` (optional - when omitted, returns all contracts)
+- **Fallback Contracts List**: `/arrendamento/consultarElementosContratos/locador` (HTML parsing)
+- **Receipt Form**: `/arrendamento/criarRecibo/<contractId>` (GET - loads form with contract details)
+- **Issue Receipt**: `/arrendamento/api/emitirRecibo` (POST - submits receipt data)
+- **Receipt Details**: `/arrendamento/detalheRecibo/<contractId>/<numReceipt>` (GET - retrieves issued receipt details)
+
+**Endpoint Details:**
+- **Authentication endpoint**: Redirects to Autenticação.Gov with proper partID and return path
+- **Primary contracts API**: Returns JSON data including `valorRenda` (rent amount) used for value defaulting
+- **Fallback contracts list**: Provides HTML that requires parsing when the API fails
+- **Receipt form endpoint**: Loads the receipt creation form with contract details and embedded JavaScript data
+- **Issue receipt endpoint**: POST endpoint that accepts receipt data and creates the receipt
+- **Receipt details endpoint**: Retrieves details of issued receipts including PDF links (future implementation)
+- All endpoints require proper authentication via Autenticação.Gov session
 
 ## Logging
 
@@ -182,7 +183,6 @@ The application creates detailed logs in the `logs/` directory with:
 
 ## Known Limitations
 
-- Web client uses simulated authentication (not actual platform integration)
 - Step-by-step mode auto-confirms all receipts (GUI confirmation dialog not implemented)
 - No actual PDF download functionality
 

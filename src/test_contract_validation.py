@@ -20,7 +20,7 @@ def test_contract_validation():
     print("=" * 70)
     
     # Initialize components
-    web_client = WebClient(testing_mode=True)  # Use testing mode for demo
+    web_client = WebClient()  # Demo purposes
     csv_handler = CSVHandler()
     processor = ReceiptProcessor(web_client)
     

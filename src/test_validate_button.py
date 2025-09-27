@@ -19,7 +19,7 @@ def test_validate_button_functionality():
     print("=" * 70)
     
     # Initialize components
-    web_client = WebClient(testing_mode=True)
+    web_client = WebClient()
     csv_handler = CSVHandler()
     processor = ReceiptProcessor(web_client)
     

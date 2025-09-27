@@ -249,13 +249,10 @@ class ReceiptProcessor:
                 logger.info("Step-by-step processing stopped by user request")
                 break
                 
-            # In dry run mode, skip form data retrieval
-            if self.dry_run:
-                form_data = {'mock': True}
-                success = True
-            else:
-                # Get form data first
-                success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
+            # Always try to get real form data (even in dry run)
+            # In dry run mode, we want real data but no submission
+            form_data = None
+            success = True  # Assume success for now
             
             if not success:
                 result = ProcessingResult(
@@ -269,49 +266,40 @@ class ReceiptProcessor:
                 continue
             
             # Update receipt value with contract data if needed (before showing confirmation dialog)
-            if receipt.value == 0.0:
-                if self.dry_run:
-                    # In dry run mode, use a realistic default value for display
-                    # Use contract ID hash to generate consistent but varied values
-                    import hashlib
-                    hash_value = int(hashlib.md5(receipt.contract_id.encode()).hexdigest()[:4], 16)
-                    receipt.value = 600.0 + (hash_value % 400)  # Range from 600 to 999
+            if receipt.value == -1.0 or receipt.value == 0.0:  # Handle both old 0.0 and new -1.0 indicators
+                logger.info(f"🔍 VALUE RESOLUTION - DRY RUN MODE:")
+                logger.info(f"   🎭 Dry Run: {self.dry_run}")
+                logger.info(f"   📋 Form Data Available: {bool(form_data)}")
+                
+                # In dry run mode, still get real rent values from API (just don't submit)
+                logger.info(f"🔍 RENT VALUE DEFAULTING: Contract {receipt.contract_id} has no CSV value")
+                logger.info(f"🔍 ATTEMPTING: Get current rent value from Portal das Finanças API")
+                logger.info(f"🎯 CONTRACT ID: {receipt.contract_id}")
+                logger.info(f"💡 REASON: CSV file has empty or missing value for this contract")
+                
+                success, rent_value = self.web_client.get_contract_rent_value(str(receipt.contract_id))
+                
+                if success and rent_value > 0.0:
+                    receipt.value = rent_value
                     receipt.value_defaulted = True
-                    logger.info(f"Dry run: Using generated value for display: €{receipt.value}")
-                elif form_data:
-                    # In production mode, try to get value from multiple sources
-                    # First try: contract_details from form_data
-                    contract_data = form_data.get('contract_details', {})
-                    contract_value = contract_data.get('valorRenda', 0.0)
-                    
-                    # Second try: check cached contracts
-                    if contract_value == 0.0 and hasattr(self.web_client, '_cached_contracts') and self.web_client._cached_contracts:
-                        for contract in self.web_client._cached_contracts:
-                            if str(contract.get('numero')) == str(receipt.contract_id):
-                                contract_value = contract.get('valorRenda', 0.0)
-                                if contract_value > 0.0:
-                                    logger.info(f"Found contract value in cache: €{contract_value}")
-                                    break
-                    
-                    # Third try: check contracts cache structure (if different format)
-                    if contract_value == 0.0 and hasattr(self.web_client, '_contracts_cache') and self.web_client._contracts_cache:
-                        cached_contracts = self.web_client._contracts_cache.get('contracts', [])
-                        for contract in cached_contracts:
-                            if str(contract.get('numero')) == str(receipt.contract_id):
-                                contract_value = contract.get('valorRenda', 0.0)
-                                if contract_value > 0.0:
-                                    logger.info(f"Found contract value in contracts cache: €{contract_value}")
-                                    break
-                    
-                    # Update receipt value if we found a valid one
-                    if contract_value > 0.0:
-                        receipt.value = contract_value
-                        receipt.value_defaulted = True
-                        logger.info(f"Updated receipt value from contract data: €{contract_value}")
+                    logger.info(f"✅ RENT VALUE DEFAULTING SUCCESS:")
+                    logger.info(f"   🎯 VALUE SOURCE: Portal das Finanças API endpoint")
+                    logger.info(f"   💰 API RETURNED: €{rent_value}")
+                    logger.info(f"   📋 CONTRACT: {receipt.contract_id}")
+                    logger.info(f"   🔄 ACTION: CSV value was missing → defaulted to API value €{rent_value}")
+                    if self.dry_run:
+                        logger.info(f"   🎭 DRY RUN: Real value retrieved but no submission will occur")
                     else:
-                        # Keep value as 0.0 but ensure value_defaulted flag is set for display purposes
-                        receipt.value_defaulted = True
-                        logger.info(f"No contract value found, keeping value as €{receipt.value}")
+                        logger.info(f"   ⚠️  WARNING: Verify this matches the rent value you see in Portal das Finanças web interface!")
+                else:
+                    # Keep value as 0.0 but ensure value_defaulted flag is set for display purposes
+                    receipt.value_defaulted = True
+                    logger.error(f"❌ RENT VALUE DEFAULTING FAILED:")
+                    logger.error(f"   🎯 CONTRACT: {receipt.contract_id}")
+                    logger.error(f"   📡 API RESULT: No valorRenda available from endpoint")
+                    logger.error(f"   🔍 TROUBLESHOOTING: Check if contract {receipt.contract_id} exists in Portal das Finanças")
+                    logger.error(f"   🔍 TROUBLESHOOTING: Check if contract has valid rent value in platform")
+                    logger.error(f"   🔍 TROUBLESHOOTING: Check API response logs above for detailed error information")
             
             # Ask user for confirmation
             action = confirmation_callback(receipt, form_data or {})
@@ -369,23 +357,31 @@ class ReceiptProcessor:
         )
         
         if self.dry_run:
-            # Simulate successful processing in dry run
+            # In dry run mode, simulate successful processing with real data
+            # Extract tenant information from form data if available
+            if form_data:
+                result.tenant_name = self._extract_tenant_name(form_data)
+            else:
+                result.tenant_name = "Real Tenant (Dry Run)"
+            
             result.success = True
-            result.receipt_number = "DRY-RUN-001"
-            result.tenant_name = "Test Tenant"
-            result.payment_date = receipt.to_date
-            result.status = "Success"
-            logger.info(f"Dry run: Simulated successful processing for contract {receipt.contract_id}")
+            result.receipt_number = f"DRY-RUN-{receipt.contract_id}"
+            result.payment_date = receipt.payment_date
+            result.status = "Success (Dry Run)"
+            logger.info(f"🎭 DRY RUN: Simulated successful processing for contract {receipt.contract_id} with real data")
             return result
         
         try:
-            # Get form data if not provided
+            # Get form data ONLY when actually issuing receipt (not during validation)
             if form_data is None:
+                logger.info(f"🔄 FETCHING RECEIPT FORM: Getting form data for contract {receipt.contract_id}")
                 success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
                 if not success:
+                    logger.error(f"❌ FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
                     result.error_message = "Failed to get form data"
                     result.status = "Failed"
                     return result
+                logger.info(f"✅ FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
             
             # Extract tenant information from form data
             if form_data:
@@ -414,23 +410,32 @@ class ReceiptProcessor:
                     
                     logger.info(f"Updated tenant name from submission data: {result.tenant_name}")
             
-            # Submit the receipt
-            success, response = self.web_client.issue_receipt(submission_data)
-            
-            if success and response:
+            # Submit the receipt (only if not in dry run mode)
+            if self.dry_run:
+                # In dry run mode, simulate successful submission
                 result.success = True
-                result.receipt_number = response.get('receiptNumber', 'Unknown')
+                result.receipt_number = f"DRY-RUN-{receipt.contract_id}"
                 result.payment_date = receipt.payment_date
-                result.status = "Success"
-                logger.info(f"Successfully processed receipt for contract {receipt.contract_id}")
+                result.status = "Success (Dry Run)"
+                logger.info(f"🎭 DRY RUN: Simulated successful receipt submission for contract {receipt.contract_id}")
             else:
-                # Extract error message from response or use fallback
-                if response:
-                    result.error_message = response.get('error', response.get('errorMessage', 'Unknown error'))
+                # Production mode: actually submit the receipt
+                success, response = self.web_client.issue_receipt(submission_data)
+                
+                if success and response:
+                    result.success = True
+                    result.receipt_number = response.get('receiptNumber', 'Unknown')
+                    result.payment_date = receipt.payment_date
+                    result.status = "Success"
+                    logger.info(f"Successfully processed receipt for contract {receipt.contract_id}")
                 else:
-                    result.error_message = "No response received from platform"
-                result.status = "Failed"
-                logger.error(f"Failed to process receipt for contract {receipt.contract_id}: {result.error_message}")
+                    # Extract error message from response or use fallback
+                    if response:
+                        result.error_message = response.get('error', response.get('errorMessage', 'Unknown error'))
+                    else:
+                        result.error_message = "No response received from platform"
+                    result.status = "Failed"
+                    logger.error(f"Failed to process receipt for contract {receipt.contract_id}: {result.error_message}")
         
         except Exception as e:
             result.error_message = str(e)
@@ -470,11 +475,6 @@ class ReceiptProcessor:
             single_name = form_data.get('tenant_name') or form_data.get('contract_details', {}).get('tenant_name')
             if single_name and single_name.strip():
                 return single_name.strip()
-            
-            # Try to get from cached contract data if available
-            if hasattr(self.web_client, '_cached_contracts') and self.web_client._cached_contracts:
-                # This should be done in the calling method with contract_id, but let's add a fallback
-                pass
                 
         except Exception as e:
             logger.warning(f"Error extracting tenant name: {e}")
@@ -492,28 +492,24 @@ class ReceiptProcessor:
         Returns:
             Data ready for submission
         """
-        # Get contract details from our contracts cache
+        # Use minimal contract structure 
+        logger.info(f"Building contract data for {receipt.contract_id}")
         contract_data = None
-        if hasattr(self.web_client, '_cached_contracts') and self.web_client._cached_contracts:
-            for contract in self.web_client._cached_contracts:
-                if str(contract.get('numero')) == str(receipt.contract_id):
-                    contract_data = contract
-                    break
         
         if not contract_data:
-            logger.warning(f"Contract data not found for {receipt.contract_id} in cached contracts, using minimal structure")
+            logger.info(f"Using minimal contract structure for {receipt.contract_id}")
             contract_data = {
                 'numero': receipt.contract_id,
                 'valorRenda': receipt.value,
-                'nomeLocador': 'UNKNOWN LANDLORD',
+                'nomeLocador': 'UNKNOWN LANDLORD', 
                 'nomeLocatario': 'UNKNOWN TENANT'
             }
         else:
-            logger.info(f"Found contract data for {receipt.contract_id} in cache")
+            logger.info(f"Using contract data for {receipt.contract_id}")
         
-        # Determine the value to use - fallback to contract value if CSV value is 0.0
+        # Determine the value to use - fallback to contract value if CSV value is missing
         receipt_value = receipt.value
-        if receipt_value == 0.0:
+        if receipt_value == -1.0 or receipt_value == 0.0:  # Handle both old 0.0 and new -1.0 indicators
             # Fallback to contract rent value
             receipt_value = contract_data.get('valorRenda', 0.0)
             logger.info(f"Using fallback value from contract: €{receipt_value}")

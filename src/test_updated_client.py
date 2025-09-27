@@ -21,11 +21,11 @@ def test_updated_client():
     password = "test"
     
     print(f"Using credentials: {username} / {'*' * len(password)}")
-    
-    # Test with production mode
-    print(f"\n1. Testing production authentication...")
-    client = WebClient(testing_mode=False)
-    
+
+    # Demo client
+    print(f"\n1. Testing authentication...")
+    client = WebClient()
+
     success, message = client.login(username, password)
     
     if success:

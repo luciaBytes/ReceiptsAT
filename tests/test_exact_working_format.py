@@ -58,7 +58,7 @@ def test_exact_working_format():
         })
         
         print("   Expected working format:")
-        print("     username=260081566&password=??????&partID=PFAP&selectedAuthMethod=N&_csrf=xxxxx&authVersion=2")
+        print("     username=34234235&password=??????&partID=PFAP&selectedAuthMethod=N&_csrf=xxxxx&authVersion=2")
         
         print("\n   Our format:")
         form_parts = []

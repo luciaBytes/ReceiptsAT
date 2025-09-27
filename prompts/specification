@@ -36,11 +36,11 @@ This project automates the issuance of rent receipts for multiple tenants throug
   - **Request Headers**: Proper User-Agent and Content-Type handling for portal compatibility
 
 ### ✅ Core Infrastructure (COMPLETED)
-- **WebClient**: Robust HTTP client with session management and authentication
+- **WebClient**: Simplified HTTP client with session management and authentication
 - **Logging System**: Comprehensive logging with file rotation and detailed error tracking
-- **GUI Framework**: Tkinter-based user interface ready for receipt processing
+- **GUI Framework**: Tkinter-based user interface with clean, simplified controls
 - **CSV Handler**: File processing with validation and error reporting
-- **Testing Infrastructure**: Comprehensive test suite with mock authentication capabilities
+- **Testing Infrastructure**: Updated test suite aligned with simplified architecture
 - **API Monitoring System**: Passive Portal das Finanças change detection and monitoring
 - **Multilingual Localization**: Complete Portuguese interface with state-based management
 - **CSV Template Generator**: Professional template generation with 6 template types

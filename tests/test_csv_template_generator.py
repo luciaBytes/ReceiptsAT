@@ -18,7 +18,7 @@ from datetime import datetime
 import sys
 
 # Add src directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from utils.csv_template_generator import CSVTemplateGenerator, TemplateType, TemplateConfig
 
@@ -93,8 +93,8 @@ class TestCSVTemplateGenerator(unittest.TestCase):
             reader = csv.reader(f)
             rows = list(reader)
             
-        # Should have descriptions + headers + sample rows
-        self.assertGreaterEqual(len(rows), 5, "Expected at least 5 rows (description, header, 3 samples)")
+        # Should have header + sample rows
+        self.assertGreaterEqual(len(rows), 4, "Expected at least 4 rows (header + 3 samples)")
         
         # Check that sample data contains contract IDs
         found_sample = False
@@ -232,7 +232,7 @@ class TestCSVTemplateGenerator(unittest.TestCase):
             with open(output_path, 'r', encoding='utf-8-sig') as f:
                 content = f.read()
                 # Should contain Portuguese characters without errors
-                self.assertIn("Contract", content)  # Basic field name should be present
+                self.assertIn("ID_Contrato", content)  # Portuguese contract field should be present
         except UnicodeDecodeError:
             self.fail("Template file is not properly UTF-8 encoded")
     
@@ -368,20 +368,23 @@ def main():
     print(f"   Errors: {len(result.errors)}")
     
     if result.failures:
-        print(f"\n❌ Failures:")
+        print(f"\n[FAIL] Failures:")
         for test, traceback in result.failures:
-            print(f"   - {test}: {traceback.split('AssertionError: ')[-1].split('\\n')[0]}")
+            error_msg = traceback.split('AssertionError: ')[-1].split('\n')[0]
+            print(f"   - {test}: {error_msg}")
     
     if result.errors:
-        print(f"\n💥 Errors:")
+        print(f"\n[ERROR] Errors:")
         for test, traceback in result.errors:
-            print(f"   - {test}: {traceback.split('\\n')[-2]}")
+            error_parts = traceback.split('\n')
+            error_msg = error_parts[-2] if len(error_parts) > 1 else traceback
+            print(f"   - {test}: {error_msg}")
     
     if result.wasSuccessful():
-        print(f"\n✅ All tests passed! CSV Template Generator is working correctly.")
+        print(f"\n[PASS] All tests passed! CSV Template Generator is working correctly.")
         return True
     else:
-        print(f"\n❌ Some tests failed. Please check the implementation.")
+        print(f"\n[FAIL] Some tests failed. Please check the implementation.")
         return False
 
 if __name__ == "__main__":

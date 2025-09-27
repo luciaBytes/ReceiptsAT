@@ -233,7 +233,7 @@ def test_mock_platform_complete():
         mock_session.cookies.keys.return_value = ['JSESSIONID', 'AUTH_TOKEN']
         
         # Create web client and processor
-        web_client = WebClient(testing_mode=False)  # Use production mode but with mocked requests
+        web_client = WebClient()  # No testing_mode parameter needed
         web_client.session = mock_session
         web_client.authenticated = True  # Bypass authentication for testing
         

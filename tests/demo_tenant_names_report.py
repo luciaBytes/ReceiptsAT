@@ -47,7 +47,7 @@ def demonstrate_tenant_names_in_report():
             
             # Setup mock web client with tenant data
             web_client = WebClient()
-            web_client.testing_mode = True
+            # Demo mode
             web_client.authenticated = True
             
             processor = ReceiptProcessor(web_client)
