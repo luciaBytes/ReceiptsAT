@@ -18,7 +18,7 @@ def test_receipt_issuing_with_error_handling():
     print("=== Testing Receipt Issuing Error Handling ===\n")
     
     # Create a web client in testing mode
-    web_client = WebClient(testing_mode=True)
+    web_client = WebClient()
     web_client.authenticated = True
     print("✓ Web client initialized in testing mode")
     

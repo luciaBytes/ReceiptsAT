@@ -194,7 +194,7 @@ def test_sample_receipts():
         mock_session.cookies.keys.return_value = ['JSESSIONID']
         
         # Set up web client
-        web_client = WebClient(testing_mode=False)
+        web_client = WebClient()
         web_client.session = mock_session
         web_client.authenticated = True
         

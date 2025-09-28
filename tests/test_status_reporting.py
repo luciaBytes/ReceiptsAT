@@ -19,7 +19,7 @@ def test_status_reporting():
     print("=" * 60)
     
     # Initialize components in testing mode
-    web_client = WebClient(testing_mode=True)
+    web_client = WebClient()
     processor = ReceiptProcessor(web_client)
     
     # Login with test credentials

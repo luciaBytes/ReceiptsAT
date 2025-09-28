@@ -19,7 +19,7 @@ def test_dry_run():
     print("=" * 60)
     
     # Initialize components
-    web_client = WebClient(testing_mode=True)  # Use testing mode to be safe
+    web_client = WebClient()  # Use default mode
     processor = ReceiptProcessor(web_client)
     
     # Enable dry run

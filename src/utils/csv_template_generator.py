@@ -72,6 +72,7 @@ class CSVTemplateGenerator:
                 TemplateField("contractId", "ID_Contrato", "Contract identifier", "123456"),
                 TemplateField("fromDate", "Data_Inicio", "Receipt period start date", "2024-07-01"),
                 TemplateField("toDate", "Data_Fim", "Receipt period end date", "2024-07-31"),
+                TemplateField("paymentDate", "Data_Pagamento", "Payment date", "2024-07-28"),
                 TemplateField("receiptType", "Tipo_Recibo", "Type of receipt", "rent"),
                 TemplateField("value", "Valor", "Receipt amount", "850.00"),
             ],
@@ -96,15 +97,15 @@ class CSVTemplateGenerator:
             "residential": [
                 {
                     "contractId": "123456", "fromDate": "2024-07-01", "toDate": "2024-07-31",
-                    "receiptType": "rent", "value": "850.00", "description": "Monthly rent payment"
+                    "paymentDate": "2024-07-28", "receiptType": "rent", "value": "850.00", "description": "Monthly rent payment"
                 },
                 {
                     "contractId": "789012", "fromDate": "2024-07-01", "toDate": "2024-07-31", 
-                    "receiptType": "utilities", "value": "120.50", "description": "Utilities payment"
+                    "paymentDate": "2024-07-25", "receiptType": "utilities", "value": "120.50", "description": "Utilities payment"
                 },
                 {
                     "contractId": "345678", "fromDate": "2024-07-01", "toDate": "2024-07-31",
-                    "receiptType": "deposit", "value": "1700.00", "description": "Security deposit"
+                    "paymentDate": "2024-07-31", "receiptType": "deposit", "value": "1700.00", "description": "Security deposit"
                 },
             ],
             
@@ -189,12 +190,7 @@ class CSVTemplateGenerator:
                 
                 writer = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 
-                # Write description header if requested
-                if config.include_descriptions:
-                    descriptions = [field.description for field in fields]
-                    writer.writerow([f"# {desc}" for desc in descriptions])
-                
-                # Write headers
+                # Write headers (removed subtitle line generation)
                 if config.include_headers:
                     writer.writerow(field_names)
                 

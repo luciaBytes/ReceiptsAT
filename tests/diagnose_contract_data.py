@@ -14,12 +14,10 @@ def diagnose_contract_data():
     """Check what data is available for contract forms."""
     
     print("=== Contract Data Diagnostic ===\n")
-    
-    # Create web client in production mode
-    web_client = WebClient(testing_mode=False)
-    print("✓ Web client created (production mode)")
-    
-    # Check if authenticated (you need to login first)
+
+    # IMPORTANT: Use testing mode to prevent real API calls
+    web_client = WebClient()
+    print("✓ Web client created (MOCK MODE - no real API calls)")    # Check if authenticated (you need to login first)
     if not web_client.is_authenticated():
         print("✗ Not authenticated. Please login through the main application first.")
         print("Then run this diagnostic to check your contract data.")

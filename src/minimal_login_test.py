@@ -23,7 +23,8 @@ def minimal_login_test():
     
     print(f"Using credentials: {username} / {'*' * len(password)}")
     
-    client = WebClient(testing_mode=False)
+    # Demo client
+    client = WebClient()
     
     try:
         # Get the login page first

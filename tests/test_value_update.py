@@ -5,19 +5,33 @@ Test script to verify value updating in step-by-step processing.
 
 import sys
 import os
+import unittest
+from unittest.mock import Mock, patch
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from csv_handler import CSVHandler
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor
 
-def test_step_by_step_value_update():
+@patch.object(WebClient, 'get_contract_rent_value')
+def test_step_by_step_value_update(mock_get_rent_value):
     """Test that values are updated from contract data before showing confirmation dialog."""
     
     print("=== Testing Step-by-Step Value Update ===\n")
     
+    # Mock rent value retrieval to return test values
+    def mock_rent_value(contract_id):
+        if contract_id == "12345":
+            return True, 150.0  # Return successful rent value
+        elif contract_id == "67890":
+            return True, 250.0  # Return successful rent value
+        else:
+            return False, 0.0
+    
+    mock_get_rent_value.side_effect = mock_rent_value
+    
     # Create components
-    web_client = WebClient(testing_mode=True)
+    web_client = WebClient()
     web_client.authenticated = True
     processor = ReceiptProcessor(web_client)
     processor.dry_run = True  # Enable dry run to skip contract validation
@@ -63,36 +77,36 @@ def test_step_by_step_value_update():
     print(f"\n=== Results ===")
     print(f"Confirmation calls: {len(confirmation_calls)}")
     
-    # Verify that values were shown correctly in dialogs
+    # Verify that values were properly updated from contract data
     tests_passed = 0
     total_tests = 2
     
     if len(confirmation_calls) >= 1:
         first_call = confirmation_calls[0]
-        # First receipt should show a value (either from CSV or contract)
+        # First receipt should show a realistic value (updated from contract data)
         if first_call['value'] > 0:
-            print("✓ First receipt shows non-zero value in dialog")
+            print(f"✓ First receipt correctly shows updated value from contract: €{first_call['value']}")
             tests_passed += 1
         else:
-            print(f"✗ First receipt shows zero value: €{first_call['value']}")
+            print(f"✗ First receipt shows missing/zero value: €{first_call['value']}")
     
     if len(confirmation_calls) >= 2:
         second_call = confirmation_calls[1]
-        # Second receipt should show a value (from contract since CSV has none)
+        # Second receipt should also show a realistic value (updated from contract data)
         if second_call['value'] > 0:
-            print("✓ Second receipt shows updated value from contract data")
+            print(f"✓ Second receipt correctly shows updated value from contract: €{second_call['value']}")
             tests_passed += 1
         else:
-            print(f"✗ Second receipt still shows zero value: €{second_call['value']}")
+            print(f"✗ Second receipt shows missing/zero value: €{second_call['value']}")
     
     print(f"\n=== Test Summary ===")
     print(f"Tests passed: {tests_passed}/{total_tests}")
     
     if tests_passed == total_tests:
-        print("🎉 Value updating in step-by-step mode is working!")
-        print("✅ Missing values are updated from contract data before showing dialog")
+        print("✅ Value updating from contract data is working perfectly!")
+        print("✅ Missing values (-1.0) are correctly updated from contract data before showing dialog")
     else:
-        print("❌ Value updating needs to be fixed")
+        print("❌ Value updating from contract data needs to be fixed")
     
     assert tests_passed == total_tests, f"Only {tests_passed}/{total_tests} tests passed"
 

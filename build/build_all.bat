@@ -4,7 +4,7 @@ echo  Portal das Financas Receipts Builder
 echo ======================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo [1/4] Installing dependencies...
 pip install -r requirements.txt
@@ -29,7 +29,7 @@ echo Build artifacts cleaned up
 
 echo.
 echo [3/5] Code signing...
-call "%~dp0build\code_sign.bat"
+call "build\code_sign.bat"
 if %ERRORLEVEL% NEQ 0 (
     echo WARNING: Code signing failed, continuing without signatures
     echo Set CODE_SIGN_CERT and CODE_SIGN_PASSWORD environment variables to enable signing
@@ -37,7 +37,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [4/5] Creating installer...
-call "%~dp0build\build_installer.bat"
+call "build\build_installer.bat"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to create installer
     exit /b 1
@@ -45,7 +45,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [5/5] Packaging for distribution...
-call "%~dp0build\package_release.bat"
+call "build\package_release.bat"
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to package release
     exit /b 1

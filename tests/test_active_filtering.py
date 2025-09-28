@@ -23,7 +23,7 @@ def test_active_contracts_filtering():
     print("Testing with mock mode to verify filtering logic:")
     print("-" * 50)
     
-    web_client = WebClient(testing_mode=True)
+    web_client = WebClient()
     
     # Login  
     success, message = web_client.login("test", "test")

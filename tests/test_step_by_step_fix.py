@@ -19,7 +19,7 @@ def test_step_by_step_invalid_contracts():
     print("=" * 70)
     
     # Initialize components in testing mode
-    web_client = WebClient(testing_mode=True)
+    web_client = WebClient()
     processor = ReceiptProcessor(web_client)
     
     # Login with test credentials
