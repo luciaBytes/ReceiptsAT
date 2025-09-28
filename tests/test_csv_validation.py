@@ -4,6 +4,7 @@ Test script to debug CSV validation issues
 
 import sys
 import os
+import tempfile
 
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -43,16 +44,22 @@ def test_csv_validation():
     else:
         print("test_data_invalid.csv not found")
     
-    # Test with user's credentials file (should fail)
-    print("\n3. Testing credentials file (should fail)...")
-    if os.path.exists("credentials"):
-        success, errors = handler.load_csv("credentials")
+    # Test with invalid file format (should fail)
+    print("\n3. Testing invalid file format (should fail)...")
+    # Create a temporary non-CSV file for testing
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        f.write("This is not a CSV file\nJust some text content")
+        temp_file = f.name
+    
+    try:
+        success, errors = handler.load_csv(temp_file)
         print(f"Success: {success}")
         print(f"Errors: {len(errors)} error(s)")
         for error in errors[:3]:  # Show first 3 errors
             print(f"  - {error}")
-    else:
-        print("credentials file not found")
+    finally:
+        os.unlink(temp_file)
     
     print("\n=== Test Complete ===")
 

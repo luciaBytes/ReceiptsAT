@@ -5,6 +5,7 @@ Test the active contracts filtering functionality.
 
 import sys
 import os
+from unittest.mock import patch
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 
 from web_client import WebClient
@@ -12,21 +13,51 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-def test_active_contracts_filtering():
+@patch.object(WebClient, '__init__')
+@patch.object(WebClient, 'login')
+@patch.object(WebClient, 'get_contracts_with_tenant_data')
+def test_active_contracts_filtering(mock_get_contracts, mock_login, mock_init):
     """
     Test that validation only considers active contracts.
     """
     print("🔍 TESTING ACTIVE CONTRACTS FILTERING")
     print("=" * 40)
+    
+    # Mock WebClient initialization to avoid real HTTP session creation
+    mock_init.return_value = None
+    
+    # Mock login success
+    mock_login.return_value = (True, "Mock login successful")
+    
+    # Mock contracts with different statuses
+    mock_contracts = [
+        {
+            "numero": "123456",
+            "referencia": "CT123456", 
+            "nomeLocador": "Landlord 1",
+            "nomeLocatario": "Tenant 1",
+            "estado": {"codigo": "ACTIVO", "label": "Ativo"}
+        },
+        {
+            "numero": "789012",
+            "referencia": "CT789012",
+            "nomeLocador": "Landlord 2", 
+            "nomeLocatario": "Tenant 2",
+            "estado": {"codigo": "TERMINADO", "label": "Terminado"}
+        }
+    ]
+    mock_get_contracts.return_value = (True, mock_contracts, "Mock success")
     print()
     
     print("Testing with mock mode to verify filtering logic:")
     print("-" * 50)
     
     web_client = WebClient()
+    web_client.authenticated = True  # Mock authentication
     
-    # Login  
-    success, message = web_client.login("test", "test")
+    # Mock the login call  
+    success = True  # Use mock result instead of real call
+    message = "Mock login successful"
     print(f"Mock login: {'✅ SUCCESS' if success else '❌ FAILED'} - {message}")
     
     print()

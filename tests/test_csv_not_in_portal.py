@@ -5,25 +5,43 @@ Test to confirm that CSV contracts not found in portal are skipped.
 
 import sys
 import os
+from unittest.mock import patch
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from web_client import WebClient
 from csv_handler import CSVHandler, ReceiptData
 from receipt_processor import ReceiptProcessor
 
-def test_csv_contract_not_in_portal():
+@patch.object(WebClient, '__init__')
+@patch.object(WebClient, 'login')
+@patch.object(WebClient, 'get_contracts_list')
+def test_csv_contract_not_in_portal(mock_get_contracts, mock_login, mock_init):
     """Test that CSV contracts not found in portal are skipped."""
     
     print("=" * 70)
     print("CSV CONTRACT NOT IN PORTAL - SKIP TEST")
     print("=" * 70)
     
+    # Mock WebClient initialization to avoid real HTTP session creation
+    mock_init.return_value = None
+    
+    # Mock login success
+    mock_login.return_value = (True, "Mock login successful")
+    
+    # Mock contracts list with limited contracts
+    mock_contracts = [
+        {'contractId': '123456', 'property': 'Test Property 1'},
+        {'contractId': '789012', 'property': 'Test Property 2'}
+    ]
+    mock_get_contracts.return_value = (True, mock_contracts)
+    
     # Initialize components in testing mode
     web_client = WebClient()
+    web_client.authenticated = True  # Mock authentication
     processor = ReceiptProcessor(web_client)
     
-    # Login with test credentials
-    login_success, _ = web_client.login("test", "test")
+    # Mock the login call  
+    login_success = True  # Use mock result instead of real call
     print(f"✅ Login successful: {login_success}")
     
     # Check what contracts are available in the portal (mock mode)

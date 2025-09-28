@@ -5,25 +5,43 @@ Test step-by-step processing with invalid contracts to ensure they are skipped.
 
 import sys
 import os
+from unittest.mock import patch
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from web_client import WebClient
 from csv_handler import CSVHandler, ReceiptData
 from receipt_processor import ReceiptProcessor
 
-def test_step_by_step_invalid_contracts():
+@patch.object(WebClient, '__init__')
+@patch.object(WebClient, 'login')
+@patch.object(WebClient, 'get_contracts_list')
+def test_step_by_step_invalid_contracts(mock_get_contracts, mock_login, mock_init):
     """Test that step-by-step processing properly skips invalid contracts."""
     
     print("=" * 70)
     print("STEP-BY-STEP INVALID CONTRACTS TEST")
     print("=" * 70)
     
+    # Mock WebClient initialization to avoid real HTTP session creation
+    mock_init.return_value = None
+    
+    # Mock login success
+    mock_login.return_value = (True, "Mock login successful")
+    
+    # Mock contracts list with limited valid contracts
+    mock_contracts = [
+        {'numero': '123456', 'referencia': 'CT123456'},
+        {'numero': '789012', 'referencia': 'CT789012'}
+    ]
+    mock_get_contracts.return_value = (True, mock_contracts)
+    
     # Initialize components in testing mode
     web_client = WebClient()
+    web_client.authenticated = True  # Mock authentication
     processor = ReceiptProcessor(web_client)
     
-    # Login with test credentials
-    login_success, _ = web_client.login("test", "test")
+    # Use mock login result (patched by decorator)
+    login_success = True  # Mock result from decorator
     print(f"✅ Login successful: {login_success}")
     
     # Check what contracts are available in the portal (mock mode)

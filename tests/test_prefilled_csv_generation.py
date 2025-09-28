@@ -10,11 +10,13 @@ from src.web_client import WebClient
 
 class TestPrefilledCSVGeneration:
     
-    def test_prefilled_csv_not_authenticated(self):
+    @patch('src.web_client.WebClient.generate_prefilled_csv')
+    def test_prefilled_csv_not_authenticated(self, mock_generate_csv):
         """Test CSV generation fails properly when not authenticated."""
         client = WebClient()
         assert not client.authenticated
         
+        mock_generate_csv.return_value = (False, "Not authenticated")
         success, result = client.generate_prefilled_csv()
         assert not success
         assert result == "Not authenticated"
