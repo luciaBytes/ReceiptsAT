@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🎯 Enhancements
+- **Active Contracts Filtering**: Prefilled CSV generation now only includes active contracts (estado.codigo == 'ACTIVO')
+  - Filters out terminated, inactive, and cancelled contracts
+  - Reduces clutter in generated CSV files
+  - Prevents processing errors from inactive contracts
+  - Provides cleaner validation reports focused on actionable data
+  - Includes comprehensive logging of filtering activity
+
 ## [1.0.2] - 2025-08-23
 
 ### 🚀 First Official Release
