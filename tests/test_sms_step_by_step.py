@@ -91,13 +91,13 @@ def test_sms_step_by_step(mock_login, mock_init):
             print("! Login failed completely")
             print(f"Error: {message}")
             
-        return True
+        # Test completed successfully
         
     except Exception as e:
         print(f"✗ Error during SMS test: {str(e)}")
         import traceback
         traceback.print_exc()
-        return False
+        assert False, f"Error during SMS test: {str(e)}"
 
 if __name__ == "__main__":
     test_sms_step_by_step()

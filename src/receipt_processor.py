@@ -267,15 +267,15 @@ class ReceiptProcessor:
             
             # Update receipt value with contract data if needed (before showing confirmation dialog)
             if receipt.value == -1.0 or receipt.value == 0.0:  # Handle both old 0.0 and new -1.0 indicators
-                logger.info(f"🔍 VALUE RESOLUTION - DRY RUN MODE:")
-                logger.info(f"   🎭 Dry Run: {self.dry_run}")
-                logger.info(f"   📋 Form Data Available: {bool(form_data)}")
+                logger.info(f"VALUE RESOLUTION - DRY RUN MODE:")
+                logger.info(f"   Dry Run: {self.dry_run}")
+                logger.info(f"   Form Data Available: {bool(form_data)}")
                 
                 # In dry run mode, still get real rent values from API (just don't submit)
-                logger.info(f"🔍 RENT VALUE DEFAULTING: Contract {receipt.contract_id} has no CSV value")
-                logger.info(f"🔍 ATTEMPTING: Get current rent value from Portal das Finanças API")
-                logger.info(f"🎯 CONTRACT ID: {receipt.contract_id}")
-                logger.info(f"💡 REASON: CSV file has empty or missing value for this contract")
+                logger.info(f"RENT VALUE DEFAULTING: Contract {receipt.contract_id} has no CSV value")
+                logger.info(f"ATTEMPTING: Get current rent value from Portal das Finanças API")
+                logger.info(f"CONTRACT ID: {receipt.contract_id}")
+                logger.info(f"REASON: CSV file has empty or missing value for this contract")
                 
                 success, rent_value = self.web_client.get_contract_rent_value(str(receipt.contract_id))
                 
@@ -283,23 +283,23 @@ class ReceiptProcessor:
                     receipt.value = rent_value
                     receipt.value_defaulted = True
                     logger.info(f"✅ RENT VALUE DEFAULTING SUCCESS:")
-                    logger.info(f"   🎯 VALUE SOURCE: Portal das Finanças API endpoint")
-                    logger.info(f"   💰 API RETURNED: €{rent_value}")
-                    logger.info(f"   📋 CONTRACT: {receipt.contract_id}")
-                    logger.info(f"   🔄 ACTION: CSV value was missing → defaulted to API value €{rent_value}")
+                    logger.info(f"   VALUE SOURCE: Portal das Finanças API endpoint")
+                    logger.info(f"   API RETURNED: €{rent_value}")
+                    logger.info(f"   CONTRACT: {receipt.contract_id}")
+                    logger.info(f"   ACTION: CSV value was missing → defaulted to API value €{rent_value}")
                     if self.dry_run:
-                        logger.info(f"   🎭 DRY RUN: Real value retrieved but no submission will occur")
+                        logger.info(f"   DRY RUN: Real value retrieved but no submission will occur")
                     else:
                         logger.info(f"   ⚠️  WARNING: Verify this matches the rent value you see in Portal das Finanças web interface!")
                 else:
                     # Keep value as 0.0 but ensure value_defaulted flag is set for display purposes
                     receipt.value_defaulted = True
                     logger.error(f"❌ RENT VALUE DEFAULTING FAILED:")
-                    logger.error(f"   🎯 CONTRACT: {receipt.contract_id}")
-                    logger.error(f"   📡 API RESULT: No valorRenda available from endpoint")
-                    logger.error(f"   🔍 TROUBLESHOOTING: Check if contract {receipt.contract_id} exists in Portal das Finanças")
-                    logger.error(f"   🔍 TROUBLESHOOTING: Check if contract has valid rent value in platform")
-                    logger.error(f"   🔍 TROUBLESHOOTING: Check API response logs above for detailed error information")
+                    logger.error(f"   CONTRACT: {receipt.contract_id}")
+                    logger.error(f"   API RESULT: No valorRenda available from endpoint")
+                    logger.error(f"   TROUBLESHOOTING: Check if contract {receipt.contract_id} exists in Portal das Finanças")
+                    logger.error(f"   TROUBLESHOOTING: Check if contract has valid rent value in platform")
+                    logger.error(f"   TROUBLESHOOTING: Check API response logs above for detailed error information")
             
             # Ask user for confirmation
             action = confirmation_callback(receipt, form_data or {})
@@ -368,13 +368,13 @@ class ReceiptProcessor:
             result.receipt_number = f"DRY-RUN-{receipt.contract_id}"
             result.payment_date = receipt.payment_date
             result.status = "Success (Dry Run)"
-            logger.info(f"🎭 DRY RUN: Simulated successful processing for contract {receipt.contract_id} with real data")
+            logger.info(f"DRY RUN: Simulated successful processing for contract {receipt.contract_id} with real data")
             return result
         
         try:
             # Get form data ONLY when actually issuing receipt (not during validation)
             if form_data is None:
-                logger.info(f"🔄 FETCHING RECEIPT FORM: Getting form data for contract {receipt.contract_id}")
+                logger.info(f"FETCHING RECEIPT FORM: Getting form data for contract {receipt.contract_id}")
                 success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
                 if not success:
                     logger.error(f"❌ FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
@@ -417,7 +417,7 @@ class ReceiptProcessor:
                 result.receipt_number = f"DRY-RUN-{receipt.contract_id}"
                 result.payment_date = receipt.payment_date
                 result.status = "Success (Dry Run)"
-                logger.info(f"🎭 DRY RUN: Simulated successful receipt submission for contract {receipt.contract_id}")
+                logger.info(f"DRY RUN: Simulated successful receipt submission for contract {receipt.contract_id}")
             else:
                 # Production mode: actually submit the receipt
                 success, response = self.web_client.issue_receipt(submission_data)

@@ -16,14 +16,14 @@ def test_api_monitor_imports():
         print("✅ Successfully imported show_api_monitor_dialog")
     except ImportError as e:
         print(f"❌ Failed to import show_api_monitor_dialog: {e}")
-        return False
+        assert False, f"Failed to import show_api_monitor_dialog: {e}"
     
     try:
         from utils.api_monitor import PortalAPIMonitor, ChangeDetection
         print("✅ Successfully imported PortalAPIMonitor and ChangeDetection")
     except ImportError as e:
         print(f"❌ Failed to import API monitor utilities: {e}")
-        return False
+        assert False, f"Failed to import API monitor utilities: {e}"
     
     try:
         # Test basic instantiation
@@ -31,10 +31,9 @@ def test_api_monitor_imports():
         print("✅ Successfully created PortalAPIMonitor instance")
     except Exception as e:
         print(f"❌ Failed to create PortalAPIMonitor instance: {e}")
-        return False
+        assert False, f"Failed to create PortalAPIMonitor instance: {e}"
     
     print("✅ All API monitor imports and basic functionality working!")
-    return True
 
 if __name__ == "__main__":
     success = test_api_monitor_imports()

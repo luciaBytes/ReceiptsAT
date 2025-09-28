@@ -44,8 +44,8 @@ class TestPrefilledCSVGeneration:
         
         # Mock contracts without rent values
         mock_get_contracts.return_value = (True, [
-            {'numero': '12345'},
-            {'numero': '67890'}
+            {'numero': '12345', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}},
+            {'numero': '67890', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}}
         ], "Success")
         
         # Mock rent value API always fails
@@ -69,8 +69,8 @@ class TestPrefilledCSVGeneration:
         
         # Mock contracts with rent values
         mock_get_contracts.return_value = (True, [
-            {'numero': '12345'},
-            {'numero': '67890'}
+            {'numero': '12345', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}},
+            {'numero': '67890', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}}
         ], "Success")
         
         # Mock rent value API returns valid values
@@ -101,14 +101,12 @@ class TestPrefilledCSVGeneration:
         client = WebClient()
         client.authenticated = True  # Mock authentication
         
-        # Mock contracts 
+        # Mock contracts
         mock_get_contracts.return_value = (True, [
-            {'numero': '12345'},  # Will have rent value
-            {'numero': '67890'},  # Will not have rent value
-            {'numero': '11111'}   # Will have rent value
-        ], "Success")
-        
-        # Mock mixed rent value results
+            {'numero': '12345', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}},  # Will have rent value
+            {'numero': '67890', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}},  # Will not have rent value
+            {'numero': '11111', 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}}   # Will have rent value
+        ], "Success")        # Mock mixed rent value results
         mock_get_rent.side_effect = [
             (True, 500.00),    # First contract - success
             (False, 0.0),      # Second contract - no rent value
@@ -148,16 +146,16 @@ class TestPrefilledCSVGeneration:
             {
                 'numero': 'C123456',
                 'nomeLocatario': 'João Silva Santos',
-                'valorRenda': 850.75  # Has rent value in bulk data
+                'valorRenda': 850.75,  # Has rent value in bulk data
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             },
             {
-                'numero': 'C789012', 
+                'numero': 'C789012',
                 'nomeLocatario': 'Maria Costa Ferreira',
-                'valorRenda': None  # No rent value in bulk data
+                'valorRenda': None,  # No rent value in bulk data
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             }
-        ], "Success")
-        
-        # Mock individual rent value API call for second contract
+        ], "Success")        # Mock individual rent value API call for second contract
         mock_get_rent.return_value = (True, 650.50)
         
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -219,7 +217,8 @@ class TestPrefilledCSVGeneration:
                 'nifLocatario': '123456789',
                 'morada': 'Rua das Flores, 123, 1º Dto, 1200-200 Lisboa',
                 'dataInicio': '2024-01-15',
-                'dataFim': '2025-01-14'
+                'dataFim': '2025-01-14',
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             },
             {
                 'numero': '2023/PT/987654',
@@ -228,7 +227,8 @@ class TestPrefilledCSVGeneration:
                 'nifLocatario': '987654321',
                 'morada': 'Av. da República, 456, 3º Esq, 4000-100 Porto',
                 'dataInicio': '2023-06-01',
-                'dataFim': '2024-05-31'
+                'dataFim': '2024-05-31',
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             },
             {
                 'numero': '2024/PT/555777',
@@ -237,14 +237,16 @@ class TestPrefilledCSVGeneration:
                 'nifLocatario': '555777888',
                 'morada': 'Rua do Comércio, 789, 2º C, 3000-050 Coimbra',
                 'dataInicio': '2024-03-01', 
-                'dataFim': '2025-02-28'
+                'dataFim': '2025-02-28',
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             },
             {
                 'numero': '2022/PT/111222',
                 'nomeLocatario': 'José António Silva Rodrigues',
                 'valorRenda': None,  # Missing rent value - should be excluded
                 'nifLocatario': '111222333',
-                'morada': 'Praça Central, 100, R/C A, 2500-000 Caldas da Rainha'
+                'morada': 'Praça Central, 100, R/C A, 2500-000 Caldas da Rainha',
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             }
         ]
         
@@ -286,7 +288,7 @@ class TestPrefilledCSVGeneration:
         
         # Mock minimal contract data
         mock_get_contracts.return_value = (True, [
-            {'numero': '12345', 'valorRenda': 500.00}
+            {'numero': '12345', 'valorRenda': 500.00, 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}}
         ], "Success")
         
         # Mock directory existence checks for fallback logic
@@ -314,12 +316,14 @@ class TestPrefilledCSVGeneration:
             {
                 'numero': 'PT/2024/ÇÃO',
                 'nomeLocatario': 'João António Conceição',
-                'valorRenda': 800.00
+                'valorRenda': 800.00,
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             },
             {
                 'numero': 'PT/2024/ÑÄÜ',
                 'nomeLocatario': 'María José Peña Müller',
-                'valorRenda': 920.75
+                'valorRenda': 920.75,
+                'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}
             }
         ], "Success")
         
