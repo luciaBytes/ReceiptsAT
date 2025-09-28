@@ -170,10 +170,10 @@ jobs:
       run: |
         echo "=== Starting build process ==="
         echo "Current directory: %CD%"
-        echo "Checking if build_all.bat exists..."
-        dir build_all.bat
-        echo "=== Executing build_all.bat ==="
-        .\build_all.bat
+        echo "Checking if build/build_all.bat exists..."
+        dir build\build_all.bat
+        echo "=== Executing build/build_all.bat ==="
+        .\build\build_all.bat
         echo "=== Build process completed ==="
       shell: cmd
         

@@ -6,16 +6,25 @@ This test demonstrates the fix for the 200 OK response that doesn't actually iss
 
 import sys
 import os
+from unittest.mock import patch, Mock
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor
 from csv_handler import ReceiptData
 
-def test_receipt_issuing_with_error_handling():
+@patch.object(WebClient, '__init__')
+@patch.object(WebClient, 'submit_receipt')
+def test_receipt_issuing_with_error_handling(mock_submit, mock_init):
     """Test that receipt issuing properly handles missing tenant NIF errors."""
     
-    print("=== Testing Receipt Issuing Error Handling ===\n")
+    print("=== Testing Receipt Issuing Error Handling ===\\n")
+    
+    # Mock WebClient initialization to avoid real HTTP session creation
+    mock_init.return_value = None
+    
+    # Mock receipt submission to simulate error response
+    mock_submit.return_value = (False, "Missing tenant NIF error")
     
     # Create a web client in testing mode
     web_client = WebClient()

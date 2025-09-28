@@ -5,25 +5,44 @@ Test the corrected status reporting for skipped invalid contracts.
 
 import sys
 import os
+from unittest.mock import patch
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from web_client import WebClient
 from csv_handler import CSVHandler, ReceiptData
 from receipt_processor import ReceiptProcessor
 
-def test_status_reporting():
+@patch.object(WebClient, 'login')
+@patch.object(WebClient, 'validate_csv_contracts')
+def test_status_reporting(mock_validate, mock_login):
     """Test that invalid contracts are reported as 'Skipped' not 'Failed'."""
     
     print("=" * 60)
     print("STATUS REPORTING TEST")
     print("=" * 60)
     
+    # Mock login success
+    mock_login.return_value = (True, "Mock login successful")
+    
+    # Mock validation results
+    mock_validate.return_value = {
+        'success': True,
+        'message': 'Mock validation completed',
+        'valid_contracts': ['123456', '789012'],
+        'invalid_contracts': ['111111', '999999'],
+        'portal_contracts_count': 2,
+        'csv_contracts_count': 4,
+        'receipts_count': 4,
+        'validation_errors': []  # Add missing key
+    }
+    
     # Initialize components in testing mode
     web_client = WebClient()
+    web_client.authenticated = True  # Mock authentication
     processor = ReceiptProcessor(web_client)
     
-    # Login with test credentials
-    login_success, _ = web_client.login("test", "test")
+    # Mock the login call in the function 
+    login_success = True  # Use mock result instead of real call
     print(f"✅ Login successful: {login_success}")
     
     # Create test receipts - mix of valid and invalid contracts

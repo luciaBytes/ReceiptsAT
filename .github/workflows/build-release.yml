@@ -67,7 +67,7 @@ jobs:
     
     - name: Build application
       run: |
-        ./build_all.bat
+        ./build/build_all.bat
     
     - name: List build outputs
       run: |
