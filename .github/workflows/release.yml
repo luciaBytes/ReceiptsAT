@@ -226,14 +226,11 @@ jobs:
         .\build\code_sign.bat
       shell: cmd
         
-    - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create GitHub Release and Upload Assets
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ steps.get-version.outputs.version }}
-        release_name: Portal Receipts App v${{ steps.get-version.outputs.version }}
+        name: Portal Receipts App v${{ steps.get-version.outputs.version }}
         body: |
           ## What's Changed
           
@@ -260,23 +257,7 @@ jobs:
           For more details, see the [documentation](https://github.com/luciaBytes/receipts/tree/main/docs).
         draft: false
         prerelease: false
-        
-    - name: Upload installer to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./releases/PortalReceiptsApp_Setup_v${{ steps.get-version.outputs.version }}.exe
-        asset_name: PortalReceiptsApp_Setup_v${{ steps.get-version.outputs.version }}.exe
-        asset_content_type: application/octet-stream
-        
-    - name: Upload release package to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./releases/PortalReceiptsApp_v${{ steps.get-version.outputs.version }}_Release.zip
-        asset_name: PortalReceiptsApp_v${{ steps.get-version.outputs.version }}_Release.zip
-        asset_content_type: application/zip
+        files: |
+          ./releases/PortalReceiptsApp_Setup_v${{ steps.get-version.outputs.version }}.exe
+          ./releases/PortalReceiptsApp_v${{ steps.get-version.outputs.version }}_Release.zip
+        generate_release_notes: true
