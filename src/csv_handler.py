@@ -1,9 +1,11 @@
 """
-CSV Handler for processing receipt data from CSV files.
+CSV Handler for processing receipt data from CSV files and Excel files.
+Supports automatic conversion from Excel (.xlsx, .xls) to CSV format.
 """
 
 import csv
 import os
+import tempfile
 from datetime import datetime
 from typing import List, Dict, Tuple
 from dataclasses import dataclass
@@ -50,13 +52,92 @@ class CSVHandler:
         self.receipts: List[ReceiptData] = []
         self.validation_errors: List[str] = []
         self.column_mapping: Dict[str, str] = {}  # Maps CSV columns to standard names
+        self.temp_csv_file: str = None  # Track temporary CSV file from Excel conversion
+    
+    def _convert_excel_to_csv(self, excel_path: str) -> Tuple[bool, str, str]:
+        """
+        Convert Excel file to CSV format.
+        
+        Args:
+            excel_path: Path to the Excel file (.xlsx or .xls)
+            
+        Returns:
+            Tuple of (success, csv_path, error_message)
+        """
+        try:
+            import openpyxl
+            
+            logger.info(f"Converting Excel file to CSV: {excel_path}")
+            
+            # Load the Excel workbook
+            try:
+                workbook = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+            except Exception as e:
+                return False, "", f"Failed to open Excel file: {str(e)}"
+            
+            # Get the first sheet
+            sheet = workbook.active
+            logger.info(f"Reading from sheet: {sheet.title}")
+            
+            # Create a temporary CSV file
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.csv', text=True)
+            os.close(temp_fd)  # Close the file descriptor
+            
+            try:
+                # Write Excel data to CSV
+                with open(temp_path, 'w', newline='', encoding='utf-8-sig') as csv_file:
+                    csv_writer = csv.writer(csv_file)
+                    
+                    row_count = 0
+                    for row in sheet.iter_rows(values_only=True):
+                        # Skip completely empty rows
+                        if all(cell is None or str(cell).strip() == '' for cell in row):
+                            continue
+                        
+                        # Convert None values to empty strings
+                        cleaned_row = ['' if cell is None else str(cell) for cell in row]
+                        csv_writer.writerow(cleaned_row)
+                        row_count += 1
+                    
+                    logger.info(f"Converted {row_count} rows from Excel to CSV")
+                
+                workbook.close()
+                
+                if row_count == 0:
+                    os.unlink(temp_path)
+                    return False, "", "Excel file is empty"
+                
+                self.temp_csv_file = temp_path
+                return True, temp_path, ""
+                
+            except Exception as e:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                workbook.close()
+                return False, "", f"Failed to write CSV: {str(e)}"
+                
+        except ImportError:
+            return False, "", "openpyxl library not installed. Please install it with: pip install openpyxl"
+        except Exception as e:
+            return False, "", f"Excel conversion error: {str(e)}"
+    
+    def _cleanup_temp_csv(self):
+        """Clean up temporary CSV file created from Excel conversion."""
+        if self.temp_csv_file and os.path.exists(self.temp_csv_file):
+            try:
+                os.unlink(self.temp_csv_file)
+                logger.info(f"Cleaned up temporary CSV file: {self.temp_csv_file}")
+                self.temp_csv_file = None
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary CSV file: {str(e)}")
     
     def load_csv(self, file_path: str) -> Tuple[bool, List[str]]:
         """
-        Load and validate CSV file. Column order is flexible - uses header names.
+        Load and validate CSV file or Excel file (with automatic conversion).
+        Column order is flexible - uses header names.
         
         Args:
-            file_path: Path to the CSV file
+            file_path: Path to the CSV or Excel file (.csv, .xlsx, .xls)
             
         Returns:
             Tuple of (success, error_messages)
@@ -64,12 +145,27 @@ class CSVHandler:
         if not os.path.exists(file_path):
             return False, ["File does not exist"]
         
+        # Clean up any previous temporary CSV file
+        self._cleanup_temp_csv()
+        
+        # Check if file is Excel format
+        file_ext = os.path.splitext(file_path)[1].lower()
+        if file_ext in ['.xlsx', '.xls']:
+            logger.info(f"Detected Excel file: {file_path}")
+            success, csv_path, error_msg = self._convert_excel_to_csv(file_path)
+            if not success:
+                return False, [error_msg]
+            
+            logger.info(f"Excel converted to temporary CSV: {csv_path}")
+            # Use the converted CSV file for the rest of the processing
+            file_path = csv_path
+        
         try:
             self.receipts.clear()
             self.validation_errors.clear()
             self.column_mapping.clear()
             
-            with open(file_path, 'r', encoding='utf-8') as file:
+            with open(file_path, 'r', encoding='utf-8-sig') as file:
                 # Try to detect dialect, with fallback to standard comma-separated
                 sample = file.read(1024)
                 file.seek(0)
@@ -178,6 +274,51 @@ class CSVHandler:
         
         return True, []
     
+    def _normalize_date(self, date_str: str) -> str:
+        """
+        Normalize date string to YYYY-MM-DD format.
+        Handles various formats including Excel datetime strings.
+        
+        Args:
+            date_str: Date string in various formats
+            
+        Returns:
+            Date in YYYY-MM-DD format
+        """
+        if not date_str:
+            return ''
+        
+        date_str = str(date_str).strip()
+        
+        # If already in correct format, return as-is
+        if len(date_str) == 10 and date_str.count('-') == 2:
+            try:
+                datetime.strptime(date_str, '%Y-%m-%d')
+                return date_str
+            except ValueError:
+                pass
+        
+        # Try to parse common date formats (including with time)
+        formats_to_try = [
+            '%Y-%m-%d %H:%M:%S',      # Excel: 2025-11-01 00:00:00
+            '%Y-%m-%d %H:%M:%S.%f',   # With microseconds
+            '%d/%m/%Y',                # European: 01/11/2025
+            '%m/%d/%Y',                # American: 11/01/2025
+            '%Y/%m/%d',                # ISO variant: 2025/11/01
+            '%d-%m-%Y',                # European with dashes
+            '%Y-%m-%d',                # ISO standard
+        ]
+        
+        for fmt in formats_to_try:
+            try:
+                dt = datetime.strptime(date_str, fmt)
+                return dt.strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        
+        # If all parsing fails, return original (will fail validation later)
+        return date_str
+    
     def _parse_row(self, row: Dict[str, str], row_num: int) -> ReceiptData:
         """Parse a single CSV row into ReceiptData using flexible column mapping."""
         try:
@@ -200,8 +341,11 @@ class CSVHandler:
                 value = -1.0
                 value_defaulted = True
             
-            # Handle payment date
-            payment_date = get_mapped_value('paymentDate')
+            # Handle and normalize dates (strip time if present)
+            from_date = self._normalize_date(get_mapped_value('fromDate'))
+            to_date = self._normalize_date(get_mapped_value('toDate'))
+            payment_date = self._normalize_date(get_mapped_value('paymentDate'))
+            
             payment_date_defaulted = False
             if not payment_date:
                 # Payment date is required - raise error
@@ -215,16 +359,18 @@ class CSVHandler:
                 receipt_type = 'rent'
                 receipt_type_defaulted = True
             
-            # Validate payment date format
-            try:
-                datetime.strptime(payment_date, '%Y-%m-%d')
-            except ValueError:
-                raise ValueError(f"Row {row_num}: paymentDate must be in YYYY-MM-DD format, got '{payment_date}'")
+            # Validate date formats (should now all be YYYY-MM-DD)
+            for date_field, date_val in [('fromDate', from_date), ('toDate', to_date), ('paymentDate', payment_date)]:
+                if date_val:
+                    try:
+                        datetime.strptime(date_val, '%Y-%m-%d')
+                    except ValueError:
+                        raise ValueError(f"Row {row_num}: {date_field} has invalid format '{date_val}', expected YYYY-MM-DD")
             
             return ReceiptData(
                 contract_id=get_mapped_value('contractId'),
-                from_date=get_mapped_value('fromDate'),
-                to_date=get_mapped_value('toDate'),
+                from_date=from_date,
+                to_date=to_date,
                 receipt_type=receipt_type,
                 value=value,
                 payment_date=payment_date,
@@ -289,6 +435,42 @@ class CSVHandler:
     def get_receipts(self) -> List[ReceiptData]:
         """Get the list of loaded receipts."""
         return self.receipts.copy()
+    
+    def filter_receipts_by_contracts(self, valid_contract_ids: List[str]) -> int:
+        """
+        Filter receipts to only include those with valid contract IDs.
+        This is used after validation to ensure we only process receipts
+        for contracts that exist on the platform.
+        
+        Args:
+            valid_contract_ids: List of contract IDs that were validated on the platform
+            
+        Returns:
+            Number of receipts removed
+        """
+        if not valid_contract_ids:
+            logger.warning("No valid contract IDs provided - all receipts will be removed")
+            removed_count = len(self.receipts)
+            self.receipts.clear()
+            return removed_count
+        
+        # Convert to strings for comparison
+        valid_ids_set = set(str(cid).strip() for cid in valid_contract_ids)
+        
+        # Filter receipts
+        original_count = len(self.receipts)
+        self.receipts = [
+            receipt for receipt in self.receipts
+            if str(receipt.contract_id).strip() in valid_ids_set
+        ]
+        removed_count = original_count - len(self.receipts)
+        
+        logger.info(f"Filtered receipts: kept {len(self.receipts)} receipts, removed {removed_count} receipts")
+        
+        if removed_count > 0:
+            logger.info(f"Removed receipts for contracts not found on platform: {removed_count}")
+        
+        return removed_count
     
     def get_contract_ids(self) -> List[str]:
         """
