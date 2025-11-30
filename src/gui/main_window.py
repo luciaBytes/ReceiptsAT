@@ -530,10 +530,14 @@ class MainWindow:
             self.login_button.config(state="normal")
 
     def _browse_csv_file(self):
-        """Browse for CSV file."""
+        """Browse for CSV or Excel file."""
         file_path = filedialog.askopenfilename(
             title=get_text('SELECT_CSV_FILE_TITLE'),
-            filetypes=[(get_text('CSV_FILE_FILTER'), "*.csv"), (get_text('ALL_FILES_FILTER'), "*.*")]
+            filetypes=[
+                ("Excel Files", "*.xlsx *.xls"),
+                (get_text('CSV_FILE_FILTER'), "*.csv"),
+                (get_text('ALL_FILES_FILTER'), "*.*")
+            ]
         )
         
         if file_path:
@@ -621,6 +625,18 @@ class MainWindow:
         self.log("INFO", f"  Invalid contracts: {len(validation_report['invalid_contracts'])}")
         self.log("INFO", f"  Missing from CSV: {len(validation_report['missing_from_csv'])}")
         
+        # FILTER CSV TO ONLY INCLUDE VALID CONTRACTS
+        if validation_report.get('valid_contracts'):
+            removed_count = self.csv_handler.filter_receipts_by_contracts(
+                validation_report['valid_contracts']
+            )
+            if removed_count > 0:
+                self.log("INFO", f"Filtered CSV: removed {removed_count} receipts for invalid contracts")
+                self.log("INFO", f"Remaining receipts: {len(self.csv_handler.get_receipts())}")
+        else:
+            self.log("WARNING", "No valid contracts found - all receipts will be filtered out")
+            self.csv_handler.filter_receipts_by_contracts([])
+        
         # Create detailed message for popup WITH TENANT NAMES
         message_parts = []
         message_parts.append(f"📊 VALIDATION SUMMARY (Active Contracts Only):")
@@ -646,6 +662,7 @@ class MainWindow:
             message_parts.append(f"\n❌ INVALID CONTRACTS (not found in active portal contracts):")
             for contract in validation_report['invalid_contracts']:
                 message_parts.append(f"  • {contract}")
+            message_parts.append(f"\nThese {len(validation_report['invalid_contracts'])} contracts have been removed from processing.")
         
         # Show MISSING FROM CSV (active contracts in portal but not in CSV)
         if validation_report.get('missing_from_csv_data'):
