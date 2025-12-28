@@ -318,36 +318,31 @@ class ReceiptProcessor:
             
             # Update receipt value with contract data if needed (before showing confirmation dialog)
             if receipt.value == -1.0 or receipt.value == 0.0:  # Handle both old 0.0 and new -1.0 indicators
-                logger.info(f"VALUE RESOLUTION - DRY RUN MODE:")
-                logger.info(f"   Dry Run: {self.dry_run}")
-                logger.info(f"   Form Data Available: {bool(form_data)}")
-                
-                # In dry run mode, still get real rent values from API (just don't submit)
                 logger.info(f"RENT VALUE DEFAULTING: Contract {receipt.contract_id} has no CSV value")
-                logger.info(f"ATTEMPTING: Get current rent value from Portal das Finanças API")
-                logger.info(f"CONTRACT ID: {receipt.contract_id}")
-                logger.info(f"REASON: CSV file has empty or missing value for this contract")
                 
-                success, rent_value = self.web_client.get_contract_rent_value(str(receipt.contract_id))
+                # First try to get rent value from cached contract data (much faster)
+                rent_value = None
+                if contract_id_str in self._contracts_data_cache:
+                    contract_data = self._contracts_data_cache[contract_id_str]
+                    rent_value = contract_data.get('valorRenda')
+                    if rent_value:
+                        logger.info(f"✅ Using cached rent value from contract data: €{rent_value}")
                 
-                if success and rent_value > 0.0:
+                # Only make API call if not found in cache
+                if not rent_value:
+                    logger.info(f"Rent value not in cache, fetching from API for contract {receipt.contract_id}")
+                    success, rent_value = self.web_client.get_contract_rent_value(str(receipt.contract_id))
+                    if not success or not rent_value:
+                        rent_value = None
+                
+                if rent_value and rent_value > 0.0:
                     receipt.value = rent_value
                     receipt.value_defaulted = True
-                    logger.info(f"✅ RENT VALUE DEFAULTING SUCCESS:")
-                    logger.info(f"   VALUE SOURCE: Portal das Finanças API endpoint")
-                    logger.info(f"   API RETURNED: €{rent_value}")
-                    logger.info(f"   CONTRACT: {receipt.contract_id}")
-                    logger.info(f"   ACTION: CSV value was missing → defaulted to API value €{rent_value}")
-                    if self.dry_run:
-                        logger.info(f"   DRY RUN: Real value retrieved but no submission will occur")
-                    else:
-                        logger.info(f"   ⚠️  WARNING: Verify this matches the rent value you see in Portal das Finanças web interface!")
+                    logger.info(f"✅ RENT VALUE DEFAULTING SUCCESS: €{rent_value} for contract {receipt.contract_id}")
                 else:
                     # Keep value as 0.0 but ensure value_defaulted flag is set for display purposes
                     receipt.value_defaulted = True
-                    logger.error(f"❌ RENT VALUE DEFAULTING FAILED:")
-                    logger.error(f"   CONTRACT: {receipt.contract_id}")
-                    logger.error(f"   API RESULT: No valorRenda available from endpoint")
+                    logger.error(f"❌ RENT VALUE DEFAULTING FAILED: No valorRenda available for contract {receipt.contract_id}")
                     logger.error(f"   TROUBLESHOOTING: Check if contract {receipt.contract_id} exists in Portal das Finanças")
                     logger.error(f"   TROUBLESHOOTING: Check if contract has valid rent value in platform")
                     logger.error(f"   TROUBLESHOOTING: Check API response logs above for detailed error information")
@@ -430,16 +425,48 @@ class ReceiptProcessor:
             return result
         
         try:
-            # Get form data ONLY when actually issuing receipt (not during validation)
+            # Get form data - use cache for preview/display, but fetch for actual submission
             if form_data is None:
-                logger.info(f"FETCHING RECEIPT FORM: Getting form data for contract {receipt.contract_id}")
-                success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
-                if not success:
-                    logger.error(f"❌ FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
-                    result.error_message = "Failed to get form data"
-                    result.status = "Failed"
-                    return result
-                logger.info(f"✅ FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
+                contract_id_str = str(receipt.contract_id)
+                
+                # For actual submission (not dry run), always fetch the full form to get all required fields
+                if not self.dry_run:
+                    logger.info(f"PRODUCTION MODE: Fetching full form data for contract {receipt.contract_id} (required for submission)")
+                    success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
+                    if not success:
+                        logger.error(f"FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
+                        result.error_message = "Failed to get form data"
+                        result.status = "Failed"
+                        return result
+                    logger.info(f"FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
+                # In dry run mode, use cached data to avoid unnecessary API calls
+                elif contract_id_str in self._contracts_data_cache:
+                    logger.info(f"DRY RUN: Using cached contract data for {receipt.contract_id} (avoiding form fetch)")
+                    cached_data = self._contracts_data_cache[contract_id_str]
+                    
+                    # Build minimal form_data from cached contract data
+                    form_data = {
+                        'contract_details': cached_data,
+                        'locatarios': cached_data.get('locatarios', []),
+                        'tenant_name': None  # Will be extracted from locatarios
+                    }
+                    
+                    # Extract tenant name from cached data
+                    locatarios = cached_data.get('locatarios', [])
+                    if locatarios and len(locatarios) > 0:
+                        form_data['tenant_name'] = locatarios[0].get('nome', '').strip()
+                    elif cached_data.get('nomeLocatario'):
+                        form_data['tenant_name'] = cached_data.get('nomeLocatario', '').strip()
+                else:
+                    # No cache - fetch form data
+                    logger.info(f"FETCHING RECEIPT FORM: Getting form data for contract {receipt.contract_id} (not in cache)")
+                    success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
+                    if not success:
+                        logger.error(f"❌ FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
+                        result.error_message = "Failed to get form data"
+                        result.status = "Failed"
+                        return result
+                    logger.info(f"✅ FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
             
             # Extract tenant information from form data
             if form_data:
@@ -674,23 +701,16 @@ class ReceiptProcessor:
             
             logger.info(f"Using single landlord name: {landlord_name}")
         
-        # Build the complete submission payload matching the API format
-        submission_data = {
-            "numContrato": int(receipt.contract_id),
-            "versaoContrato": form_data.get('versaoContrato', 1),
-            "nifEmitente": form_data.get('nifEmitente', None),
-            "nomeEmitente": form_data.get('nomeEmitente', contract_data.get('nomeLocador', 'UNKNOWN LANDLORD')),
-            "isNifEmitenteColetivo": False,
-            "valor": float(receipt_value),
-            "tipoContrato": {
-                "codigo": "ARREND",
-                "label": "Arrendamento"
-            },
-            "locadores": locadores_list,
-            "locatarios": locatarios_list,
-            "imoveis": [
+        # Build imoveis array - use extracted data if available, otherwise fallback to minimal structure
+        imoveis_list = form_data.get('contract_details', {}).get('imoveis') or form_data.get('imoveis')
+        
+        if not imoveis_list:
+            # Fallback to minimal structure if no imoveis data was extracted
+            logger.warning(f"No imoveis data found for contract {receipt.contract_id}, using minimal fallback structure")
+            property_address = form_data.get('property_address') or form_data.get('contract_details', {}).get('property_address') or contract_data.get('imovelAlternateId', 'UNKNOWN ADDRESS')
+            imoveis_list = [
                 {
-                    "morada": form_data.get('property_address') or form_data.get('contract_details', {}).get('property_address') or contract_data.get('imovelAlternateId', 'UNKNOWN ADDRESS'),
+                    "morada": property_address,
                     "tipo": {
                         "codigo": "U",
                         "label": "Urbano"
@@ -701,7 +721,25 @@ class ReceiptProcessor:
                     "editableMode": False,
                     "ordem": 1
                 }
-            ],
+            ]
+        else:
+            logger.info(f"Using extracted imoveis data for contract {receipt.contract_id}: {len(imoveis_list)} properties")
+        
+        # Build the complete submission payload matching the API format
+        submission_data = {
+            "numContrato": int(receipt.contract_id),
+            "versaoContrato": form_data.get('versaoContrato', 1),
+            "nifEmitente": form_data.get('nifEmitente'),
+            "nomeEmitente": form_data.get('nomeEmitente', contract_data.get('nomeLocador', 'UNKNOWN LANDLORD')),
+            "isNifEmitenteColetivo": False,
+            "valor": float(receipt_value),
+            "tipoContrato": {
+                "codigo": "ARREND",
+                "label": "Arrendamento"
+            },
+            "locadores": locadores_list,
+            "locatarios": locatarios_list,
+            "imoveis": imoveis_list,
             "hasNifHerancaIndivisa": form_data.get('contract_details', {}).get('hasNifHerancaIndivisa', False),
             "locadoresHerancaIndivisa": form_data.get('contract_details', {}).get('locadoresHerancaIndivisa', []),
             "herdeiros": form_data.get('contract_details', {}).get('herdeiros', []),
@@ -713,6 +751,39 @@ class ReceiptProcessor:
                 "label": "Renda"
             }
         }
+        
+        # Validate critical fields before submission
+        logger.info("=" * 60)
+        logger.info(f"SUBMISSION DATA PREPARED FOR CONTRACT {receipt.contract_id}")
+        logger.info("=" * 60)
+        logger.info(f"  numContrato: {submission_data['numContrato']}")
+        logger.info(f"  versaoContrato: {submission_data.get('versaoContrato', 'MISSING')}")
+        logger.info(f"  nifEmitente: {submission_data.get('nifEmitente', 'MISSING')}")
+        logger.info(f"  nomeEmitente: {submission_data.get('nomeEmitente', 'MISSING')}")
+        logger.info(f"  valor: €{submission_data['valor']}")
+        logger.info(f"  locadores count: {len(submission_data['locadores'])}")
+        logger.info(f"  locatarios count: {len(submission_data['locatarios'])}")
+        logger.info(f"  dataInicio: {submission_data['dataInicio']}")
+        logger.info(f"  dataFim: {submission_data['dataFim']}")
+        logger.info(f"  dataRecebimento: {submission_data.get('dataRecebimento', 'MISSING')}")
+        
+        # Critical validation
+        missing_fields = []
+        if not submission_data.get('nifEmitente'):
+            missing_fields.append('nifEmitente')
+        if not submission_data.get('versaoContrato'):
+            missing_fields.append('versaoContrato')
+        if not submission_data.get('dataRecebimento'):
+            missing_fields.append('dataRecebimento')
+        
+        if missing_fields:
+            logger.error("=" * 60)
+            logger.error("❌ CRITICAL: MISSING REQUIRED FIELDS!")
+            logger.error(f"Missing fields: {', '.join(missing_fields)}")
+            logger.error(f"Form data keys available: {list(form_data.keys())}")
+            logger.error("=" * 60)
+        
+        logger.info("=" * 60)
         
         # Check if this is an inheritance case and log accordingly
         has_inheritance = form_data.get('contract_details', {}).get('hasNifHerancaIndivisa', False)

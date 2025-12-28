@@ -1126,15 +1126,53 @@ class WebClient:
                             contract_details['locadoresHerancaIndivisa'] = []
                             contract_details['herdeiros'] = []
                         
-                        # Try to extract imoveis (property) data
-                        imoveis_pattern = r'"imoveis":\s*\[(.*?)\]'
+                        # Try to extract imoveis (property) data - COMPLETE STRUCTURE
+                        imoveis_pattern = r'"imoveis":\s*(\[.*?\])'
                         imoveis_match = re.search(imoveis_pattern, script_content, re.DOTALL)
                         if imoveis_match:
-                            imoveis_data = imoveis_match.group(1)
-                            # Extract property address
-                            address_match = re.search(r'"morada":\s*"([^"]+)"', imoveis_data)
-                            if address_match:
-                                contract_details['property_address'] = address_match.group(1).strip()
+                            logger.info("Found imoveis data in JavaScript")
+                            
+                            try:
+                                # Parse the full imoveis array as JSON
+                                imoveis_json = imoveis_match.group(1)
+                                # Clean up the JSON
+                                imoveis_json = re.sub(r',\s*}', '}', imoveis_json)
+                                imoveis_json = re.sub(r',\s*]', ']', imoveis_json)
+                                
+                                imoveis_array = json.loads(imoveis_json)
+                                contract_details['imoveis'] = imoveis_array
+                                logger.info(f"Extracted {len(imoveis_array)} properties from JavaScript")
+                                
+                                # Log property details for debugging
+                                for i, prop in enumerate(imoveis_array):
+                                    prop_address = prop.get('morada', 'N/A')
+                                    prop_artigo = prop.get('artigo', 'N/A')
+                                    prop_alternate_id = prop.get('alternateId', 'N/A')
+                                    logger.info(f"Property {i+1}: Address={prop_address[:50]}..., Artigo={prop_artigo}, AlternateId={prop_alternate_id}")
+                                
+                                # For backward compatibility, also set the first property's address
+                                if imoveis_array:
+                                    contract_details['property_address'] = imoveis_array[0].get('morada', '')
+                                    logger.info(f"Primary property address: {contract_details['property_address'][:50]}...")
+                                    
+                            except (json.JSONDecodeError, ValueError) as e:
+                                logger.warning(f"Failed to parse imoveis JSON, falling back to minimal structure: {e}")
+                                
+                                # Fallback to extracting just the address
+                                imoveis_data = imoveis_match.group(1)
+                                address_match = re.search(r'"morada":\s*"([^"]+)"', imoveis_data)
+                                if address_match:
+                                    contract_details['property_address'] = address_match.group(1).strip()
+                                    # Create minimal imoveis structure as fallback
+                                    contract_details['imoveis'] = [{
+                                        "morada": contract_details['property_address'],
+                                        "tipo": {"codigo": "U", "label": "Urbano"},
+                                        "parteComum": False,
+                                        "bemOmisso": False,
+                                        "novo": False,
+                                        "editableMode": False,
+                                        "ordem": 1
+                                    }]
                         
                         form_data['contract_details'] = contract_details
                         form_data['has_contract_data'] = True

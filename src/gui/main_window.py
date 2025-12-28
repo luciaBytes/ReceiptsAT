@@ -268,16 +268,11 @@ class MainWindow:
         )
         gui_handler.setFormatter(formatter)
         
-        # Add handler to root logger to capture all logs
-        root_logger = logging.getLogger()
-        root_logger.addHandler(gui_handler)
-        
-        # Also add to specific loggers
-        for logger_name in ['receipts_app', 'receipts_app.web_client', 
-                           'receipts_app.receipt_processor', 'receipts_app.gui.main_window']:
-            logger_obj = logging.getLogger(logger_name)
-            if gui_handler not in logger_obj.handlers:
-                logger_obj.addHandler(gui_handler)
+        # Add handler only to the main receipts_app logger (not root or specific children)
+        # This avoids duplication since child loggers propagate to parent
+        receipts_logger = logging.getLogger('receipts_app')
+        if gui_handler not in receipts_logger.handlers:
+            receipts_logger.addHandler(gui_handler)
     
     def _create_tooltip(self, widget, text):
         """Create a tooltip for a widget."""
@@ -891,7 +886,7 @@ class MainWindow:
         if successful > 0:
             summary_parts.append(f"Successful: {successful}")
         if skipped > 0:
-            summary_parts.append(f"Skipped (invalid contracts): {skipped}")
+            summary_parts.append(f"Skipped: {skipped}")
         if failed > 0:
             summary_parts.append(f"Failed: {failed}")
         
