@@ -731,13 +731,41 @@ class WebClient:
             return True, "Already logged out"
         
         try:
+            # Call server-side logout endpoint first
+            logout_url = "https://www.acesso.gov.pt/jsp/logout.jsp"
+            logout_params = {
+                'partID': 'PFAP',
+                'path': '/geral/atauth/logout'
+            }
+            
+            logger.info(f"Calling server logout endpoint: {logout_url}")
+            response = self.session.get(
+                logout_url,
+                params=logout_params,
+                allow_redirects=True,
+                timeout=10
+            )
+            
+            logger.info(f"Logout response status: {response.status_code}")
+            
+            # Clear client-side session data
             self.authenticated = False
             self.session.cookies.clear()
             self.login_attempts = 0  # Reset login attempts
-            logger.info("Logged out successfully")
+            self._current_username = None  # Clear stored username
+            self.pending_2fa = False  # Reset 2FA flag
+            
+            logger.info("Logged out successfully (server-side and client-side)")
             return True, "Logged out successfully"
+            
         except Exception as e:
             logger.error(f"Error during logout: {str(e)}")
+            # Still clear client-side data even if server call fails
+            self.authenticated = False
+            self.session.cookies.clear()
+            self.login_attempts = 0
+            self._current_username = None
+            self.pending_2fa = False
             return False, f"Logout failed: {str(e)}"
     
     def get_contracts_list(self) -> Tuple[bool, Any]:
