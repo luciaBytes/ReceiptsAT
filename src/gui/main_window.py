@@ -403,6 +403,12 @@ class MainWindow:
             self.login_button.config(state="disabled")
             self.logout_button.config(state="normal")
             
+            # Reload CSV file if one was previously selected
+            csv_path = self.csv_file_path.get()
+            if csv_path:
+                self.log("INFO", f"Reloading CSV file for new account: {csv_path}")
+                self._validate_csv_file(csv_path)
+            
             self._update_start_button_state()
             
             # Start periodic session check
@@ -467,6 +473,13 @@ class MainWindow:
             
             # Clear password field for security
             self.password_entry.delete(0, tk.END)
+            
+            # Clear session-derived data (keep file selection for reload on next login)
+            self.csv_handler.clear_data()
+            self.processor.results.clear()
+            self.progress_var.set(0)
+            self.status_var.set(get_text('STATUS_READY'))
+            self.log("INFO", "Cleared session-derived data for account switch")
             
             # Update start button state
             self._update_start_button_state()
