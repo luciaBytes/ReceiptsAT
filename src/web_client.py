@@ -13,9 +13,11 @@ from urllib.parse import urljoin, urlparse
 
 try:
     from .utils.logger import get_logger
+    from .utils.api_monitor import APIMonitor
 except ImportError:
     # Fallback for when imported directly
     from utils.logger import get_logger
+    from utils.api_monitor import APIMonitor
 
 logger = get_logger(__name__)
 
@@ -54,6 +56,9 @@ class WebClient:
         self.login_attempts = 0
         self.max_login_attempts = 3
         self._current_username = None  # Store username for 2FA verification
+        
+        # Initialize API monitor
+        self.api_monitor = APIMonitor()
         
         # Keep SSL verification enabled for security
         self.session.verify = True
@@ -822,7 +827,7 @@ class WebClient:
     def get_receipt_form(self, contract_id: str) -> Tuple[bool, Dict]:
         """
         Get receipt form data for a specific contract.
-        ⚠️  CRITICAL: This method should ONLY be called when actually issuing receipts!
+          CRITICAL: This method should ONLY be called when actually issuing receipts!
         
         Args:
             contract_id: Contract ID to get form data for
@@ -1135,6 +1140,8 @@ class WebClient:
                             try:
                                 # Parse the full imoveis array as JSON
                                 imoveis_json = imoveis_match.group(1)
+                                logger.debug(f"Raw imoveis JSON (first 500 chars): {imoveis_json[:500]}")
+                                
                                 # Clean up the JSON
                                 imoveis_json = re.sub(r',\s*}', '}', imoveis_json)
                                 imoveis_json = re.sub(r',\s*]', ']', imoveis_json)
@@ -1148,15 +1155,18 @@ class WebClient:
                                     prop_address = prop.get('morada', 'N/A')
                                     prop_artigo = prop.get('artigo', 'N/A')
                                     prop_alternate_id = prop.get('alternateId', 'N/A')
-                                    logger.info(f"Property {i+1}: Address={prop_address[:50]}..., Artigo={prop_artigo}, AlternateId={prop_alternate_id}")
+                                    prop_codigo_postal = prop.get('codigoPostal', 'N/A')
+                                    logger.info(f"Property {i+1}: Address={prop_address[:50] if prop_address != 'N/A' else 'N/A'}..., Artigo={prop_artigo}, AlternateId={prop_alternate_id}, PostalCode={prop_codigo_postal}")
                                 
                                 # For backward compatibility, also set the first property's address
                                 if imoveis_array:
                                     contract_details['property_address'] = imoveis_array[0].get('morada', '')
-                                    logger.info(f"Primary property address: {contract_details['property_address'][:50]}...")
+                                    logger.info(f"Primary property address: {contract_details['property_address'][:50] if contract_details['property_address'] else 'N/A'}...")
                                     
                             except (json.JSONDecodeError, ValueError) as e:
-                                logger.warning(f"Failed to parse imoveis JSON, falling back to minimal structure: {e}")
+                                logger.error(f"Failed to parse imoveis JSON: {e}")
+                                logger.debug(f"Problematic JSON (first 1000 chars): {imoveis_json[:1000] if 'imoveis_json' in locals() else 'Not extracted'}")
+                                logger.warning("Falling back to minimal imoveis structure")
                                 
                                 # Fallback to extracting just the address
                                 imoveis_data = imoveis_match.group(1)
@@ -1199,7 +1209,7 @@ class WebClient:
             Tuple of (success, response_data)
         """
         if not self.authenticated:
-            logger.error("❌ RECEIPT ISSUE FAILED: Not authenticated")
+            logger.error(" RECEIPT ISSUE FAILED: Not authenticated")
             return False, None
         
         # Heavy logging for receipt issuing - CRITICAL MONITORING
@@ -1270,17 +1280,25 @@ class WebClient:
             logger.info(f"   Contract Type: {payload.get('tipoContrato')}")
             logger.info(f"   Landlords Count: {len(payload.get('locadores', []))}")
             logger.info(f"   Tenants Count: {len(payload.get('locatarios', []))}")
-            logger.info(f"   🏢 Properties Count: {len(payload.get('imoveis', []))}")
-            logger.info(f"   ⚰️  Has Inheritance: {payload.get('hasNifHerancaIndivisa')}")
-            logger.info(f"   🗓️ Date Range: {payload.get('dataInicio')} → {payload.get('dataFim')}")
-            logger.info(f"   💳 Payment Date: {payload.get('dataRecebimento')}")
+            logger.info(f"    Properties Count: {len(payload.get('imoveis', []))}")
+            logger.info(f"     Has Inheritance: {payload.get('hasNifHerancaIndivisa')}")
+            logger.info(f"    Date Range: {payload.get('dataInicio')} → {payload.get('dataFim')}")
+            logger.info(f"    Payment Date: {payload.get('dataRecebimento')}")
             
             # Log full payload for debugging (be careful with sensitive data)
             import json
             payload_json = json.dumps(payload, indent=2, ensure_ascii=False, default=str)
-            logger.debug(f"🔍 FULL PAYLOAD JSON:\n{payload_json}")
+            logger.debug(f" FULL PAYLOAD JSON:\n{payload_json}")
             
-            logger.info("📡 SUBMITTING RECEIPT TO PORTAL DAS FINANÇAS...")
+            logger.info(" SUBMITTING RECEIPT TO PORTAL DAS FINANÇAS...")
+            
+            # Validate payload before submission
+            self.api_monitor.validate_api_call(
+                endpoint='/arrendamento/api/emitirRecibo',
+                method='POST',
+                payload=payload,
+                contract_id=str(contract_id)
+            )
             
             # Submit the receipt
             response = self.session.post(
@@ -1290,19 +1308,29 @@ class WebClient:
                 timeout=60
             )
             
-            logger.info(f"📥 RECEIPT SUBMISSION RESPONSE: HTTP {response.status_code}")
-            logger.info(f"🕐 Response Time: {response.elapsed.total_seconds():.2f} seconds")
-            logger.info(f"📏 Response Size: {len(response.text)} bytes")
+            logger.info(f" RECEIPT SUBMISSION RESPONSE: HTTP {response.status_code}")
+            logger.info(f" Response Time: {response.elapsed.total_seconds():.2f} seconds")
+            logger.info(f" Response Size: {len(response.text)} bytes")
             
             if response.status_code == 200:
-                logger.info("✅ RECEIPT SUBMISSION: HTTP 200 OK - Processing response...")
+                logger.info(" RECEIPT SUBMISSION: HTTP 200 OK - Processing response...")
                 try:
                     response_data = response.json()
+                    
+                    # Validate response structure
+                    self.api_monitor.validate_api_call(
+                        endpoint='/arrendamento/api/emitirRecibo',
+                        method='POST',
+                        payload=payload,
+                        response_status=200,
+                        response_data=response_data,
+                        contract_id=str(contract_id)
+                    )
                     
                     # Heavy logging for response analysis
                     logger.info("RESPONSE DATA ANALYSIS:")
                     logger.info(f"   Response Type: {type(response_data)}")
-                    logger.info(f"   🔑 Response Keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'Not a dict'}")
+                    logger.info(f"    Response Keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'Not a dict'}")
                     
                     # Log full response for monitoring
                     import json
@@ -1334,20 +1362,32 @@ class WebClient:
                         field_errors = response_data.get('fieldErrors', {})
                         
                         logger.error("=" * 80)
-                        logger.error("❌ RECEIPT SUBMISSION FAILED (Platform Error)")
+                        logger.error(" RECEIPT SUBMISSION FAILED (Platform Error)")
                         logger.error(f"Contract: {payload.get('numContrato')}")
                         logger.error(f"Value: €{payload.get('valor')}")
-                        logger.error(f"🚨 Error Message: {error_msg}")
+                        logger.error(f" Error Message: {error_msg}")
                         
                         if field_errors:
-                            logger.error("🔍 FIELD ERRORS:")
+                            logger.error(" FIELD ERRORS:")
                             error_details = []
                             for field, error in field_errors.items():
                                 error_details.append(f"{field}: {error}")
-                                logger.error(f"   ❌ {field}: {error}")
+                                logger.error(f"    {field}: {error}")
                             error_msg += f" Field errors: {'; '.join(error_details)}"
                         
                         logger.error("=" * 80)
+                        
+                        # Validate and log error
+                        self.api_monitor.validate_api_call(
+                            endpoint='/arrendamento/api/emitirRecibo',
+                            method='POST',
+                            payload=payload,
+                            response_status=200,
+                            response_data=response_data,
+                            error=error_msg,
+                            contract_id=str(contract_id)
+                        )
+                        
                         return False, {
                             'success': False,
                             'error': error_msg,
@@ -1356,14 +1396,14 @@ class WebClient:
                         
                 except ValueError as json_error:
                     # Response might not be JSON - but still might be success
-                    logger.warning("⚠️  RESPONSE NOT JSON - Checking if receipt was issued...")
+                    logger.warning("  RESPONSE NOT JSON - Checking if receipt was issued...")
                     logger.warning(f"JSON Parse Error: {json_error}")
                     logger.info(f"Raw Response (first 1000 chars): {response.text[:1000]}")
                     
                     # Save full response for debugging
                     with open('debug_receipt_response.html', 'w', encoding='utf-8') as f:
                         f.write(response.text)
-                    logger.info("💾 Full response saved to debug_receipt_response.html")
+                    logger.info(" Full response saved to debug_receipt_response.html")
                     
                     # Try to detect success indicators in HTML
                     success_indicators = ['sucesso', 'êxito', 'receipt', 'recibo', 'emitido']
@@ -1371,7 +1411,7 @@ class WebClient:
                     found_indicators = [ind for ind in success_indicators if ind in text_lower]
                     
                     if found_indicators:
-                        logger.info(f"✅ SUCCESS INDICATORS FOUND: {found_indicators}")
+                        logger.info(f" SUCCESS INDICATORS FOUND: {found_indicators}")
                         logger.info("ASSUMING RECEIPT ISSUED SUCCESSFULLY (non-JSON response)")
                         return True, {
                             'receiptNumber': 'ISSUED_NON_JSON',
@@ -1379,7 +1419,7 @@ class WebClient:
                             'response_text': response.text[:500]
                         }
                     else:
-                        logger.error("❌ NO SUCCESS INDICATORS FOUND in non-JSON response")
+                        logger.error(" NO SUCCESS INDICATORS FOUND in non-JSON response")
                         return False, {
                             'success': False,
                             'error': 'Non-JSON response without success indicators',
@@ -1387,11 +1427,21 @@ class WebClient:
                         }
             else:
                 logger.error("=" * 80)
-                logger.error(f"❌ RECEIPT SUBMISSION FAILED: HTTP {response.status_code}")
+                logger.error(f" RECEIPT SUBMISSION FAILED: HTTP {response.status_code}")
                 logger.error(f"Contract: {contract_id}")
                 logger.error(f"Value: €{receipt_value}")
                 logger.error(f"Response Preview: {response.text[:500]}")
                 logger.error("=" * 80)
+                
+                # Validate and log HTTP error
+                self.api_monitor.validate_api_call(
+                    endpoint='/arrendamento/api/emitirRecibo',
+                    method='POST',
+                    payload=payload,
+                    response_status=response.status_code,
+                    error=f"HTTP {response.status_code} error",
+                    contract_id=str(contract_id)
+                )
                 
                 return False, {
                     'success': False,
@@ -1402,12 +1452,22 @@ class WebClient:
                 
         except Exception as e:
             logger.error("=" * 80)
-            logger.error("🚨 RECEIPT SUBMISSION EXCEPTION!")
-            logger.error(f"📋 Contract: {contract_id}")
-            logger.error(f"💰 Value: €{receipt_value}")
-            logger.error(f"❌ Exception Type: {type(e).__name__}")
-            logger.error(f"❌ Exception Message: {str(e)}")
+            logger.error(" RECEIPT SUBMISSION EXCEPTION!")
+            logger.error(f" Contract: {contract_id}")
+            logger.error(f" Value: €{receipt_value}")
+            logger.error(f" Exception Type: {type(e).__name__}")
+            logger.error(f" Exception Message: {str(e)}")
             logger.error("=" * 80)
+            
+            # Validate and log exception
+            self.api_monitor.validate_api_call(
+                endpoint='/arrendamento/api/emitirRecibo',
+                method='POST',
+                payload=submission_data if 'submission_data' in locals() else None,
+                error=str(e),
+                contract_id=str(contract_id)
+            )
+            
             return False, {
                 'success': False,
                 'error': str(e)
@@ -1422,7 +1482,7 @@ class WebClient:
             return False, [], "Not authenticated"
         
         # Log entry point for debugging
-        logger.info("🔍 ENTERING get_contracts_with_tenant_data method")
+        logger.info(" ENTERING get_contracts_with_tenant_data method")
 
         # Always fetch fresh data from API (cache removed)
         
@@ -1522,8 +1582,8 @@ class WebClient:
             ajax_url = "https://imoveis.portaldasfinancas.gov.pt/arrendamento/api/obterElementosContratosEmissaoRecibos/locador"
             
             # Log the endpoint being used
-            logger.info(f"📡 CONTRACTS ENDPOINT: {ajax_url}")
-            logger.info("🔍 This is the primary API endpoint for retrieving contract data with rent values (valorRenda)")
+            logger.info(f" CONTRACTS ENDPOINT: {ajax_url}")
+            logger.info(" This is the primary API endpoint for retrieving contract data with rent values (valorRenda)")
             
             # Set AJAX headers (important for API call)
             ajax_headers = {
@@ -1544,10 +1604,10 @@ class WebClient:
             
             response = self.session.get(ajax_url, headers=ajax_headers, timeout=15)
             
-            logger.info(f"📥 AJAX Response status: {response.status_code}")
-            logger.info(f"📥 AJAX Response URL: {response.url}")
-            logger.info(f"📥 AJAX Response content length: {len(response.text)} chars")
-            logger.info(f"📥 AJAX Response headers: {dict(response.headers)}")
+            logger.info(f" AJAX Response status: {response.status_code}")
+            logger.info(f" AJAX Response URL: {response.url}")
+            logger.info(f" AJAX Response content length: {len(response.text)} chars")
+            logger.info(f" AJAX Response headers: {dict(response.headers)}")
             
             # Log response content preview (first 500 chars)
             if response.text:
@@ -1567,7 +1627,7 @@ class WebClient:
                     # Parse JSON response
                     contracts_data = response.json()
                     
-                    logger.info(f"✅ JSON parsing successful. Data type: {type(contracts_data)}")
+                    logger.info(f" JSON parsing successful. Data type: {type(contracts_data)}")
                     logger.info(f"CONTRACTS DATA STRUCTURE: {type(contracts_data).__name__}")
                     
                     if isinstance(contracts_data, list):
@@ -1575,7 +1635,7 @@ class WebClient:
                         
                         # Log detailed information about contracts received
                         logger.info("🏠 CONTRACTS SUMMARY FROM BULK API:")
-                        logger.info("🔍 RENT VALUE SOURCE: Bulk API obterElementosContratosEmissaoRecibos/locador")
+                        logger.info(" RENT VALUE SOURCE: Bulk API obterElementosContratosEmissaoRecibos/locador")
                         for i, contract in enumerate(contracts_data[:5]):  # Log first 5 contracts
                             if isinstance(contract, dict):
                                 contract_id = contract.get('numero', 'N/A')
@@ -1584,9 +1644,9 @@ class WebClient:
                                 status = contract.get('estado', {}).get('label', 'N/A') if isinstance(contract.get('estado'), dict) else 'N/A'
                                 logger.info(f"   Contract {i+1}: ID={contract_id}")
                                 logger.info(f"       Bulk Rent Value: €{rent_value}")
-                                logger.info(f"       👤 Tenant: {tenant}")
+                                logger.info(f"        Tenant: {tenant}")
                                 logger.info(f"       Status: {status}")
-                                logger.info(f"       🔍 Available keys: {list(contract.keys())}")
+                                logger.info(f"        Available keys: {list(contract.keys())}")
                         
                         if len(contracts_data) > 5:
                             logger.info(f"   ... and {len(contracts_data) - 5} more contracts")
@@ -1594,7 +1654,7 @@ class WebClient:
                         # Log sample of complete contract structure (first contract if available)
                         if contracts_data:
                             sample = contracts_data[0]
-                            logger.info(f"🔍 Sample contract data keys: {list(sample.keys()) if isinstance(sample, dict) else 'Not a dict'}")
+                            logger.info(f" Sample contract data keys: {list(sample.keys()) if isinstance(sample, dict) else 'Not a dict'}")
                             logger.info(f"Complete sample contract: {sample}")
                         else:
                             logger.info("📭 Contracts array is empty - user has no contracts")
@@ -1773,14 +1833,14 @@ class WebClient:
             # Fetch contracts list from Portal das Finanças
             contracts_url = "https://imoveis.portaldasfinancas.gov.pt/arrendamento/consultarElementosContratos/locador"
             
-            logger.info(f"📡 FALLBACK CONTRACTS ENDPOINT: {contracts_url}")
-            logger.info("🔍 This is the HTML fallback endpoint for contract data (used when AJAX fails)")
+            logger.info(f" FALLBACK CONTRACTS ENDPOINT: {contracts_url}")
+            logger.info(" This is the HTML fallback endpoint for contract data (used when AJAX fails)")
             logger.info(f"Fetching contracts from: {contracts_url}")
             response = self.session.get(contracts_url, timeout=15)
             
-            logger.info(f"📥 HTML Response status: {response.status_code}")
-            logger.info(f"📥 HTML Response URL: {response.url}")
-            logger.info(f"📥 HTML Response content length: {len(response.text)} chars")
+            logger.info(f" HTML Response status: {response.status_code}")
+            logger.info(f" HTML Response URL: {response.url}")
+            logger.info(f" HTML Response content length: {len(response.text)} chars")
             
             # Log response content preview (first 500 chars)
             if response.text:
@@ -2035,7 +2095,7 @@ class WebClient:
             params = {'contractId': contract_id}
             
             logger.info(f"� RENT VALUE DEBUG: Getting rent value for contract {contract_id}")
-            logger.info(f"📡 ENDPOINT: {api_url}?contractId={contract_id}")
+            logger.info(f" ENDPOINT: {api_url}?contractId={contract_id}")
             logger.info(f"PURPOSE: This endpoint should return the CURRENT rent value from Portal das Finanças")
             
             headers = {
@@ -2049,7 +2109,7 @@ class WebClient:
             }
             
             response = self.session.get(api_url, headers=headers, params=params, timeout=30)
-            logger.info(f"📥 Rent value API response: {response.status_code}")
+            logger.info(f" Rent value API response: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
@@ -2065,7 +2125,7 @@ class WebClient:
                         contract_numero = str(contract.get('numero', ''))
                         logger.info(f"   Contract {i+1}: numero={contract_numero}")
                         if contract_numero == str(contract_id):
-                            logger.info(f"✅ FOUND matching contract {contract_id}")
+                            logger.info(f" FOUND matching contract {contract_id}")
                             logger.info(f"Contract data keys: {list(contract.keys())}")
                             if 'valorRenda' in contract:
                                 rent_value = float(contract['valorRenda'])
@@ -2074,9 +2134,9 @@ class WebClient:
                                 logger.info(f"This value comes from Portal das Finanças API response")
                                 return True, rent_value
                             else:
-                                logger.warning(f"⚠️  'valorRenda' field missing in contract data")
+                                logger.warning(f"  'valorRenda' field missing in contract data")
                                 logger.info(f"Available fields: {list(contract.keys())}")
-                    logger.warning(f"⚠️  Contract {contract_id} not found in response array")
+                    logger.warning(f"  Contract {contract_id} not found in response array")
                     logger.info(f"Available contract numbers: {[str(c.get('numero', 'N/A')) for c in data]}")
                     return False, 0.0
                 elif isinstance(data, dict):
@@ -2086,23 +2146,23 @@ class WebClient:
                         rent_value = float(data['valorRenda'])
                         logger.info(f"🎯 RENT VALUE SOURCE: API endpoint obterElementosContratosEmissaoRecibos")
                         logger.info(f"🎯 RENT VALUE: Contract {contract_id} = €{rent_value}")
-                        logger.info(f"💰 This value comes from Portal das Finanças API response")
+                        logger.info(f" This value comes from Portal das Finanças API response")
                         return True, rent_value
                     else:
-                        logger.warning(f"⚠️  'valorRenda' not found in response for contract {contract_id}")
+                        logger.warning(f"  'valorRenda' not found in response for contract {contract_id}")
                         logger.info(f"Available fields: {list(data.keys())}")
                         return False, 0.0
                 else:
-                    logger.warning(f"⚠️  Unexpected response format for contract {contract_id}: {type(data)}")
+                    logger.warning(f"  Unexpected response format for contract {contract_id}: {type(data)}")
                     return False, 0.0
             else:
-                logger.error(f"❌ Failed to get rent value. Status: {response.status_code}")
+                logger.error(f" Failed to get rent value. Status: {response.status_code}")
                 if response.text:
                     logger.error(f"Response content: {response.text[:200]}...")
                 return False, 0.0
                 
         except Exception as e:
-            logger.error(f"❌ Error getting rent value for contract {contract_id}: {str(e)}")
+            logger.error(f" Error getting rent value for contract {contract_id}: {str(e)}")
             return False, 0.0
 
     def generate_prefilled_csv(self, save_directory: str = None) -> Tuple[bool, str]:
@@ -2140,16 +2200,16 @@ class WebClient:
                     status_label = estado.get('label', 'Unknown')
                     if status_code == 'ACTIVO':
                         active_contracts.append(contract)
-                        logger.debug(f"   ✅ Active contract: {contract.get('numero', 'N/A')} ({status_label})")
+                        logger.debug(f"    Active contract: {contract.get('numero', 'N/A')} ({status_label})")
                     else:
-                        logger.debug(f"   ❌ Inactive contract: {contract.get('numero', 'N/A')} ({status_label})")
+                        logger.debug(f"    Inactive contract: {contract.get('numero', 'N/A')} ({status_label})")
                 elif isinstance(estado, str):
                     # Handle case where estado might be a string
                     if estado.upper() in ['ACTIVO', 'ATIVO', 'ACTIVE']:
                         active_contracts.append(contract)
-                        logger.debug(f"   ✅ Active contract: {contract.get('numero', 'N/A')} ({estado})")
+                        logger.debug(f"    Active contract: {contract.get('numero', 'N/A')} ({estado})")
                     else:
-                        logger.debug(f"   ❌ Inactive contract: {contract.get('numero', 'N/A')} ({estado})")
+                        logger.debug(f"    Inactive contract: {contract.get('numero', 'N/A')} ({estado})")
                 else:
                     # Skip contracts with unknown status for safety
                     logger.debug(f"   ❓ Skipped contract with unknown status: {contract.get('numero', 'N/A')}")
@@ -2193,28 +2253,28 @@ class WebClient:
             # Use user-specified directory if provided, otherwise smart fallback
             if save_directory and os.path.exists(save_directory):
                 filepath = os.path.join(save_directory, filename)
-                logger.info(f"💾 Using user-selected directory: {save_directory}")
+                logger.info(f" Using user-selected directory: {save_directory}")
             else:
                 # Fallback to Desktop -> Documents -> Current directory
                 try:
                     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
                     if os.path.exists(desktop_path):
                         filepath = os.path.join(desktop_path, filename)
-                        logger.info("💾 Saving to Desktop (default location)")
+                        logger.info(" Saving to Desktop (default location)")
                     else:
                         # Fallback to Documents folder
                         documents_path = os.path.join(os.path.expanduser("~"), "Documents")
                         if os.path.exists(documents_path):
                             filepath = os.path.join(documents_path, filename)
-                            logger.info("💾 Saving to Documents (fallback location)")
+                            logger.info(" Saving to Documents (fallback location)")
                         else:
                             # Final fallback to current directory
                             filepath = os.path.join(os.getcwd(), filename)
-                            logger.info("💾 Saving to current directory (final fallback)")
+                            logger.info(" Saving to current directory (final fallback)")
                 except:
                     # If all else fails, use current directory
                     filepath = os.path.join(os.getcwd(), filename)
-                    logger.warning("💾 Using current directory (error fallback)")
+                    logger.warning(" Using current directory (error fallback)")
             
             logger.info(f"Generating pre-filled CSV: {filename}")
             logger.info(f"� Saving to: {filepath}")
@@ -2241,7 +2301,7 @@ class WebClient:
                 
                 if bulk_rent_value and float(bulk_rent_value) > 0:
                     rent_value = float(bulk_rent_value)
-                    logger.info(f"   ✅ Using bulk data: Contract {contract_id} = €{rent_value}")
+                    logger.info(f"    Using bulk data: Contract {contract_id} = €{rent_value}")
                     
                     row = [
                         contract_id,
@@ -2271,9 +2331,9 @@ class WebClient:
                         ]
                         csv_rows.append(row)
                         contracts_with_values += 1
-                        logger.info(f"   ✅ Added via API: Contract {contract_id} = €{rent_value}")
+                        logger.info(f"    Added via API: Contract {contract_id} = €{rent_value}")
                     else:
-                        logger.warning(f"   ⚠️  Skipped: Contract {contract_id} (no rent value from bulk or API)")
+                        logger.warning(f"     Skipped: Contract {contract_id} (no rent value from bulk or API)")
                         logger.info(f"   Available contract data: {list(contract.keys())}")
                 
                 # Add small delay to avoid rate limiting
@@ -2300,10 +2360,10 @@ class WebClient:
                 
                 logger.info(f"CSV GENERATION SUMMARY:")
                 logger.info(f"   Total contracts processed: {contracts_processed}")
-                logger.info(f"   ✅ Contracts with rent values: {contracts_with_values}")
-                logger.info(f"   ⚠️  Contracts skipped: {contracts_processed - contracts_with_values}")
+                logger.info(f"    Contracts with rent values: {contracts_with_values}")
+                logger.info(f"     Contracts skipped: {contracts_processed - contracts_with_values}")
             
-            logger.info(f"✅ Pre-filled CSV generated successfully: {filepath}")
+            logger.info(f" Pre-filled CSV generated successfully: {filepath}")
             return True, filepath
             
         except Exception as e:

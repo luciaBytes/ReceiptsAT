@@ -29,7 +29,7 @@ def test_updated_client():
     success, message = client.login(username, password)
     
     if success:
-        print(f"   ✅ Authentication successful!")
+        print(f"    Authentication successful!")
         print(f"   Message: {message}")
         
         # Test that we can get the receipt creation page
@@ -39,31 +39,31 @@ def test_updated_client():
             response = client.session.get(receipt_url, timeout=10)
             
             if response.status_code == 200:
-                print(f"   ✅ Can access receipt page (status: {response.status_code})")
+                print(f"    Can access receipt page (status: {response.status_code})")
                 
                 # Check if we're still logged in (look for logout link or user info)
                 if 'logout' in response.text.lower() or 'sair' in response.text.lower():
-                    print(f"   ✅ Still logged in (found logout link)")
+                    print(f"    Still logged in (found logout link)")
                 else:
-                    print(f"   ⚠️  May not be fully logged in (no logout link found)")
+                    print(f"     May not be fully logged in (no logout link found)")
                     
                 # Save a sample of the page
                 with open('logged_in_receipt_page.html', 'w', encoding='utf-8') as f:
                     f.write(response.text[:5000] + "..." if len(response.text) > 5000 else response.text)
-                print(f"   💾 Saved sample to logged_in_receipt_page.html")
+                print(f"    Saved sample to logged_in_receipt_page.html")
                 
             else:
-                print(f"   ❌ Cannot access receipt page (status: {response.status_code})")
+                print(f"    Cannot access receipt page (status: {response.status_code})")
                 
                 if response.status_code == 302:
                     location = response.headers.get('location', 'No location header')
                     print(f"   Redirect to: {location}")
                     
         except Exception as e:
-            print(f"   ❌ Error accessing receipt page: {str(e)}")
+            print(f"    Error accessing receipt page: {str(e)}")
         
     else:
-        print(f"   ❌ Authentication failed!")
+        print(f"    Authentication failed!")
         print(f"   Message: {message}")
         return False
     
@@ -75,12 +75,12 @@ def test_updated_client():
         print(f"   Status for authenticated request: {response.status_code}")
         
         if response.status_code == 200:
-            print(f"   ✅ Session maintained")
+            print(f"    Session maintained")
         else:
-            print(f"   ⚠️  Session may have issues")
+            print(f"     Session may have issues")
             
     except Exception as e:
-        print(f"   ❌ Error testing session: {str(e)}")
+        print(f"    Error testing session: {str(e)}")
     
     return success
 
@@ -89,4 +89,4 @@ if __name__ == "__main__":
     if success:
         print("\n🎉 WEB CLIENT WORKING CORRECTLY!")
     else:
-        print("\n❌ WEB CLIENT NEEDS FIXES")
+        print("\n WEB CLIENT NEEDS FIXES")

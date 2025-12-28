@@ -39,12 +39,12 @@ def analyze_400_error():
         csrf_match = re.search(csrf_pattern, response.text)
         
         if not csrf_match:
-            print("❌ CSRF token not found")
+            print(" CSRF token not found")
             return
         
         csrf_param_name = csrf_match.group(1)
         csrf_token = csrf_match.group(2)
-        print(f"✅ CSRF Token: {csrf_token[:20]}...")
+        print(f" CSRF Token: {csrf_token[:20]}...")
         
         # Look for more configuration data in the JavaScript
         print("\n2. Analyzing JavaScript configuration...")
@@ -179,10 +179,10 @@ def analyze_400_error():
                         filename = f"400_response_{scenario['name'].replace(' ', '_')}.html"
                         with open(filename, 'w', encoding='utf-8') as f:
                             f.write(response.text)
-                        print(f"   💾 Saved to {filename}")
+                        print(f"    Saved to {filename}")
                         
                 elif response.status_code in [200, 302, 303]:
-                    print(f"   ✅ Success! Status {response.status_code}")
+                    print(f"    Success! Status {response.status_code}")
                     if 'location' in response.headers:
                         print(f"   Redirect: {response.headers['location']}")
                     break
@@ -190,7 +190,7 @@ def analyze_400_error():
                     print(f"   Other status: {response.status_code}")
                     
             except requests.exceptions.RequestException as e:
-                print(f"   ❌ Request failed: {e}")
+                print(f"    Request failed: {e}")
                 
         print(f"\n4. Summary:")
         print(f"   • All scenarios returned 400 suggests field validation issue")
@@ -198,7 +198,7 @@ def analyze_400_error():
         print(f"   • May need to analyze the exact field names/formats expected")
         
     except Exception as e:
-        print(f"❌ Analysis failed: {str(e)}")
+        print(f" Analysis failed: {str(e)}")
         import traceback
         traceback.print_exc()
 

@@ -38,12 +38,12 @@ def auth_method_login_test():
         csrf_match = re.search(csrf_pattern, response.text)
         
         if not csrf_match:
-            print("❌ CSRF token not found")
+            print(" CSRF token not found")
             return
         
         csrf_param_name = csrf_match.group(1)
         csrf_token = csrf_match.group(2)
-        print(f"✅ CSRF Token: {csrf_token[:20]}...")
+        print(f" CSRF Token: {csrf_token[:20]}...")
         
         # Extract authentication methods
         auth_methods_pattern = r"authMethods:\s*stringOrNull\('([^']+)'\)"
@@ -51,9 +51,9 @@ def auth_method_login_test():
         
         if auth_methods_match:
             auth_methods = auth_methods_match.group(1)
-            print(f"✅ Auth methods: {auth_methods}")
+            print(f" Auth methods: {auth_methods}")
         else:
-            print("❌ Auth methods not found")
+            print(" Auth methods not found")
             auth_methods = "NIF,EORI,CARTAO_DE_CIDADAO"  # Default from previous analysis
         
         # Since username is numeric (NIF), try NIF authentication
@@ -111,7 +111,7 @@ def auth_method_login_test():
             print(f"   URL: {response.url}")
             
             if response.status_code == 500:
-                print("   ❌ Still 500 error with auth method")
+                print("    Still 500 error with auth method")
                 
                 # Try alternative: post to different endpoint
                 print("\n5. Trying alternative endpoint...")
@@ -136,15 +136,15 @@ def auth_method_login_test():
                         print(f"     Status: {alt_response.status_code}")
                         
                         if alt_response.status_code != 500:
-                            print(f"     ✅ Found working endpoint: {alt_url}")
+                            print(f"      Found working endpoint: {alt_url}")
                             response = alt_response
                             break
                     except:
-                        print(f"     ❌ Failed")
+                        print(f"      Failed")
                         continue
                 
             if response.status_code == 500:
-                print("\n❌ All attempts resulted in 500 error")
+                print("\n All attempts resulted in 500 error")
                 print("\nThis suggests the server has an internal issue or:")
                 print("1. The authentication system is temporarily down")
                 print("2. There's a server-side bug with the current configuration")
@@ -153,7 +153,7 @@ def auth_method_login_test():
                 print("5. The credentials format is incorrect")
                 
             elif response.status_code in [200, 302, 303]:
-                print("   ✅ Success! No 500 error")
+                print("    Success! No 500 error")
                 
                 if 'location' in response.headers:
                     location = response.headers['location']
@@ -161,22 +161,22 @@ def auth_method_login_test():
                     
                     # Check if redirect indicates success or failure
                     if 'error' in location.lower() or 'denied' in location.lower():
-                        print("   ❌ Redirect indicates authentication failure")
+                        print("    Redirect indicates authentication failure")
                     elif 'dashboard' in location.lower() or 'home' in location.lower():
-                        print("   ✅ Redirect indicates authentication success")
+                        print("    Redirect indicates authentication success")
                     else:
-                        print("   ⚠️  Redirect purpose unclear")
+                        print("     Redirect purpose unclear")
                 
                 # Save response
                 with open('auth_method_response.html', 'w', encoding='utf-8') as f:
                     f.write(response.text)
-                print("   💾 Saved to auth_method_response.html")
+                print("    Saved to auth_method_response.html")
                 
         except requests.exceptions.RequestException as e:
-            print(f"   ❌ Request failed: {e}")
+            print(f"    Request failed: {e}")
             
     except Exception as e:
-        print(f"❌ Test failed: {str(e)}")
+        print(f" Test failed: {str(e)}")
         import traceback
         traceback.print_exc()
 

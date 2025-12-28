@@ -699,14 +699,14 @@ class MainWindow:
         
         # Create detailed message for popup WITH TENANT NAMES
         message_parts = []
-        message_parts.append(f"📊 VALIDATION SUMMARY (Active Contracts Only):")
+        message_parts.append(f" VALIDATION SUMMARY (Active Contracts Only):")
         message_parts.append(f"Active portal contracts: {validation_report['portal_contracts_count']}")
         message_parts.append(f"CSV contracts: {validation_report['csv_contracts_count']}")
         message_parts.append(f"Valid matches: {len(validation_report['valid_contracts'])}")
         
         # Show VALID CONTRACTS with tenant names
         if validation_report.get('valid_contracts_data'):
-            message_parts.append(f"\n✅ VALID CONTRACTS:")
+            message_parts.append(f"\n VALID CONTRACTS:")
             for contract in validation_report['valid_contracts_data']:
                 contract_id = contract.get('numero') or contract.get('referencia', 'N/A')
                 tenant_name = contract.get('nomeLocatario', 'Unknown')
@@ -719,14 +719,14 @@ class MainWindow:
         
         # Show INVALID CONTRACTS (in CSV but not in portal)
         if validation_report['invalid_contracts']:
-            message_parts.append(f"\n❌ INVALID CONTRACTS (not found in active portal contracts):")
+            message_parts.append(f"\n INVALID CONTRACTS (not found in active portal contracts):")
             for contract in validation_report['invalid_contracts']:
                 message_parts.append(f"  • {contract}")
             message_parts.append(f"\nThese {len(validation_report['invalid_contracts'])} contracts have been removed from processing.")
         
         # Show MISSING FROM CSV (active contracts in portal but not in CSV)
         if validation_report.get('missing_from_csv_data'):
-            message_parts.append(f"\n⚠️ ACTIVE PORTAL CONTRACTS NOT IN CSV:")
+            message_parts.append(f"\n ACTIVE PORTAL CONTRACTS NOT IN CSV:")
             for contract in validation_report['missing_from_csv_data']:
                 contract_id = contract.get('numero') or contract.get('referencia', 'N/A')
                 tenant_name = contract.get('nomeLocatario', 'Unknown')
@@ -737,7 +737,7 @@ class MainWindow:
                 message_parts.append(f"    €{rent_amount:.2f} - {property_addr}")
         
         if validation_report['validation_errors']:
-            message_parts.append(f"\n🔍 VALIDATION ISSUES:")
+            message_parts.append(f"\n VALIDATION ISSUES:")
             for error in validation_report['validation_errors']:
                 message_parts.append(f"  • {error}")
         
@@ -1300,7 +1300,7 @@ class ValidationResultDialog:
         
         # Valid contracts
         if self.validation_report.get('valid_contracts_data'):
-            lines.append(f"\n✅ Valid Contracts:")
+            lines.append(f"\n Valid Contracts:")
             for contract in self.validation_report['valid_contracts_data']:
                 contract_id = contract.get('numero') or contract.get('referencia', 'N/A')
                 tenant_name = contract.get('nomeLocatario', 'Unknown')
@@ -1308,13 +1308,13 @@ class ValidationResultDialog:
         
         # Invalid contracts
         if self.validation_report.get('invalid_contracts'):
-            lines.append(f"\n❌ Invalid Contracts:")
+            lines.append(f"\n Invalid Contracts:")
             for contract in self.validation_report['invalid_contracts']:
                 lines.append(f"  • {contract}")
         
         # Validation errors
         if self.validation_report.get('validation_errors'):
-            lines.append(f"\n🔍 Validation Issues:")
+            lines.append(f"\n Validation Issues:")
             for error in self.validation_report['validation_errors']:
                 lines.append(f"  • {error}")
         
@@ -1332,10 +1332,10 @@ class ValidationResultDialog:
         
         # Set icon based on validation results
         if self.has_issues:
-            icon_text = "⚠️"
+            icon_text = ""
             icon_color = "orange"
         else:
-            icon_text = "✅"
+            icon_text = ""
             icon_color = "green"
         
         # Create main frame with padding (messagebox style)

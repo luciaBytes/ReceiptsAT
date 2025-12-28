@@ -67,7 +67,7 @@ class APIMonitorDialog:
         title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         title_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(title_frame, text="🔍 Monitor de API Portal das Finanças", 
+        ttk.Label(title_frame, text=" Monitor de API Portal das Finanças", 
                  font=('TkDefaultFont', 12, 'bold')).grid(row=0, column=0, sticky=tk.W)
         
         self.status_label = ttk.Label(title_frame, text="Status: Carregando...", 
@@ -78,9 +78,9 @@ class APIMonitorDialog:
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        ttk.Button(button_frame, text="🔄 Verificar Agora", 
+        ttk.Button(button_frame, text=" Verificar Agora", 
                   command=self._start_monitoring_check).grid(row=0, column=0, padx=(0, 5))
-        ttk.Button(button_frame, text="📊 Relatório Completo", 
+        ttk.Button(button_frame, text=" Relatório Completo", 
                   command=self._show_full_report).grid(row=0, column=1, padx=5)
         ttk.Button(button_frame, text="⚙️ Configurações", 
                   command=self._show_config).grid(row=0, column=2, padx=5)
@@ -107,7 +107,7 @@ class APIMonitorDialog:
     def _create_overview_tab(self):
         """Create the overview tab."""
         overview_frame = ttk.Frame(self.notebook)
-        self.notebook.add(overview_frame, text="📊 Visão Geral")
+        self.notebook.add(overview_frame, text=" Visão Geral")
         
         # Overview text
         self.overview_text = scrolledtext.ScrolledText(overview_frame, height=20, width=80)
@@ -116,7 +116,7 @@ class APIMonitorDialog:
     def _create_changes_tab(self):
         """Create the changes tab."""
         changes_frame = ttk.Frame(self.notebook)
-        self.notebook.add(changes_frame, text="🔄 Alterações")
+        self.notebook.add(changes_frame, text=" Alterações")
         
         # Changes tree
         columns = ('Timestamp', 'Tipo', 'Severidade', 'Descrição')
@@ -145,7 +145,7 @@ class APIMonitorDialog:
     def _create_history_tab(self):
         """Create the monitoring history tab."""
         history_frame = ttk.Frame(self.notebook)
-        self.notebook.add(history_frame, text="📈 Histórico")
+        self.notebook.add(history_frame, text=" Histórico")
         
         # History text
         self.history_text = scrolledtext.ScrolledText(history_frame, height=20, width=80)
@@ -179,10 +179,10 @@ class APIMonitorDialog:
             report = self.monitor.generate_monitoring_report()
             
             overview_text = f"""
-🔍 RELATÓRIO DE MONITORIZAÇÃO - Portal das Finanças
+ RELATÓRIO DE MONITORIZAÇÃO - Portal das Finanças
 {'=' * 60}
 
-📊 Estatísticas Gerais:
+ Estatísticas Gerais:
   • Páginas monitorizadas: {report['total_pages_monitored']}
   • Total de snapshots: {report['total_snapshots_taken']}
   • Total de alterações: {report['total_changes_detected']}
@@ -202,13 +202,13 @@ class APIMonitorDialog:
                 overview_text += f"  {severity_emoji} {severity.capitalize()}: {count}\n"
             
             if report['critical_changes']:
-                overview_text += f"\n🚨 Alterações Críticas Recentes:\n"
+                overview_text += f"\n Alterações Críticas Recentes:\n"
                 for change in report['critical_changes']:
                     timestamp = change['timestamp'][:19].replace('T', ' ')
                     overview_text += f"  • {timestamp}: {change['description']}\n"
             
             if report['last_check_times']:
-                overview_text += f"\n⏰ Últimas Verificações:\n"
+                overview_text += f"\n Últimas Verificações:\n"
                 for url, timestamp in report['last_check_times'].items():
                     check_time = timestamp[:19].replace('T', ' ')
                     domain = url.split('/')[2] if len(url.split('/')) > 2 else url
@@ -268,7 +268,7 @@ class APIMonitorDialog:
     def _update_history(self):
         """Update the history display."""
         try:
-            history_text = "📈 HISTÓRICO DE MONITORIZAÇÃO\n"
+            history_text = " HISTÓRICO DE MONITORIZAÇÃO\n"
             history_text += "=" * 50 + "\n\n"
             
             # Get all changes grouped by date
@@ -390,17 +390,17 @@ class APIMonitorDialog:
         details_text = scrolledtext.ScrolledText(details_window, wrap=tk.WORD)
         details_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        details_content = f"""🔍 DETALHES DA ALTERAÇÃO
+        details_content = f""" DETALHES DA ALTERAÇÃO
 {'=' * 50}
 
-⏰ Timestamp: {change.timestamp}
+ Timestamp: {change.timestamp}
 🏷️ Tipo: {change.change_type}
-📊 Severidade: {change.severity}
+ Severidade: {change.severity}
 
-📝 Descrição:
+ Descrição:
 {change.description}
 
-🔄 Valor Anterior:
+ Valor Anterior:
 {change.old_value}
 
 🆕 Valor Novo:

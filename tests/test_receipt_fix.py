@@ -6,7 +6,7 @@ This test demonstrates the fix for the 200 OK response that doesn't actually iss
 
 import sys
 import os
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from web_client import WebClient
@@ -29,6 +29,9 @@ def test_receipt_issuing_with_error_handling(mock_submit, mock_init):
     # Create a web client in testing mode
     web_client = WebClient()
     web_client.authenticated = True
+    web_client.receipts_base_url = "https://portaldefinancas.gov.pt/pt/aRecibosOnlineForm"
+    web_client.session = MagicMock()
+    web_client.api_monitor = MagicMock()
     print("✓ Web client initialized in testing mode")
     
     # Create receipt processor

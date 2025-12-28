@@ -38,12 +38,12 @@ def minimal_login_test():
         csrf_match = re.search(csrf_pattern, response.text)
         
         if not csrf_match:
-            print("❌ CSRF token not found")
+            print(" CSRF token not found")
             return
         
         csrf_param_name = csrf_match.group(1)
         csrf_token = csrf_match.group(2)
-        print(f"✅ CSRF Token: {csrf_token[:20]}...")
+        print(f" CSRF Token: {csrf_token[:20]}...")
         
         # Prepare MINIMAL form data - only the essentials
         print("\n2. Preparing minimal form data...")
@@ -79,15 +79,15 @@ def minimal_login_test():
             print(f"   URL: {response.url}")
             
             if response.status_code == 500:
-                print("   ❌ Still getting 500 error with minimal fields")
+                print("    Still getting 500 error with minimal fields")
                 
                 # Save minimal response
                 with open('minimal_500_response.html', 'w', encoding='utf-8') as f:
                     f.write(response.text)
-                print("   💾 Saved to minimal_500_response.html")
+                print("    Saved to minimal_500_response.html")
                 
             elif response.status_code in [200, 302, 303]:
-                print("   ✅ Success! No more 500 error")
+                print("    Success! No more 500 error")
                 
                 if 'location' in response.headers:
                     print(f"   Redirect to: {response.headers['location']}")
@@ -97,27 +97,27 @@ def minimal_login_test():
                 if any(success_indicator in response_lower for success_indicator in [
                     'dashboard', 'bem-vindo', 'sucesso', 'authenticated'
                 ]):
-                    print("   ✅ Login appears successful!")
+                    print("    Login appears successful!")
                 elif any(error_indicator in response_lower for error_indicator in [
                     'erro', 'invalid', 'incorreto', 'failed'
                 ]):
-                    print("   ❌ Login failed - invalid credentials")
+                    print("    Login failed - invalid credentials")
                 else:
-                    print("   ⚠️  Login status unclear")
+                    print("     Login status unclear")
                     
                 # Save successful response for analysis
                 with open('minimal_success_response.html', 'w', encoding='utf-8') as f:
                     f.write(response.text)
-                print("   💾 Saved to minimal_success_response.html")
+                print("    Saved to minimal_success_response.html")
                 
             else:
-                print(f"   ⚠️  Unexpected status: {response.status_code}")
+                print(f"     Unexpected status: {response.status_code}")
                 
         except requests.exceptions.RequestException as e:
-            print(f"   ❌ Request failed: {e}")
+            print(f"    Request failed: {e}")
             
     except Exception as e:
-        print(f"❌ Test failed: {str(e)}")
+        print(f" Test failed: {str(e)}")
         import traceback
         traceback.print_exc()
 
