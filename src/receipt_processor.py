@@ -225,9 +225,6 @@ class ReceiptProcessor:
         logger.info(f"Starting step-by-step processing of {len(receipts)} receipts")
         self.results.clear()
         
-        # ALWAYS validate contracts to:
-        # 1. Filter out invalid contracts (even in dry run)
-        # 2. Populate cache with tenant data (needed for display)
         validation_report = self.validate_contracts(receipts)
         
         if not validation_report['success']:
@@ -244,11 +241,11 @@ class ReceiptProcessor:
                 self.results.append(error_result)
             return self.results.copy()
         
-        # Filter out invalid contracts BEFORE processing (applies to both dry run and production)
         if validation_report['invalid_contracts']:
             logger.warning(f"Found {len(validation_report['invalid_contracts'])} invalid contracts")
             
             invalid_contracts_set = set(validation_report['invalid_contracts'])
+            
             for receipt in receipts:
                 if receipt.contract_id in invalid_contracts_set:
                     error_result = ProcessingResult(
@@ -259,12 +256,12 @@ class ReceiptProcessor:
                         status="Skipped"
                     )
                     self.results.append(error_result)
+            
                     logger.warning(f"Skipping receipt for invalid contract: {receipt.contract_id}")
             
-            # Filter out invalid contracts from processing (only process valid ones)
             valid_receipts = [r for r in receipts if r.contract_id not in invalid_contracts_set]
             mode = "dry run" if self.dry_run else "production"
-            logger.info(f"Step-by-step ({mode}): Processing {len(valid_receipts)} receipts with valid contracts (skipping {len(receipts) - len(valid_receipts)})")
+            logger.info(f"Step-by-step ({mode}): Processing {len(valid_receipts)} receipts with valid contracts (skipping {len(receipts) - len(valid_receipts)} invalid contracts)")
             receipts = valid_receipts
         
         for receipt in receipts:
