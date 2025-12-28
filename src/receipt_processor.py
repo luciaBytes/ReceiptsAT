@@ -425,20 +425,38 @@ class ReceiptProcessor:
             return result
         
         try:
-            # Get form data - use cache for preview/display, but fetch for actual submission
-            if form_data is None:
+            # Get form data - always fetch full form data for actual submission
+            # The form_data passed in from step-by-step mode only contains tenant_name for display
+            # but we need full form data (nifEmitente, versaoContrato, locadores, locatarios, imoveis) for submission
+            
+            # Check if form_data has the required submission fields
+            requires_full_form_fetch = (
+                form_data is None or 
+                'nifEmitente' not in form_data or 
+                'versaoContrato' not in form_data or
+                'contract_details' not in form_data
+            )
+            
+            if requires_full_form_fetch:
                 contract_id_str = str(receipt.contract_id)
                 
                 # For actual submission (not dry run), always fetch the full form to get all required fields
                 if not self.dry_run:
-                    logger.info(f"PRODUCTION MODE: Fetching full form data for contract {receipt.contract_id} (required for submission)")
-                    success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
+                    logger.info(f"FETCHING FULL FORM DATA: Contract {receipt.contract_id} needs complete submission data")
+                    success, full_form_data = self.web_client.get_receipt_form(receipt.contract_id)
                     if not success:
                         logger.error(f"FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
                         result.error_message = "Failed to get form data"
                         result.status = "Failed"
                         return result
-                    logger.info(f"FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
+                    logger.info(f"✅ FORM DATA SUCCESS: Retrieved complete form data for contract {receipt.contract_id}")
+                    
+                    # Preserve tenant_name from preview if available
+                    if form_data and 'tenant_name' in form_data:
+                        full_form_data['tenant_name'] = form_data['tenant_name']
+                    
+                    form_data = full_form_data
+                    
                 # In dry run mode, use cached data to avoid unnecessary API calls
                 elif contract_id_str in self._contracts_data_cache:
                     logger.info(f"DRY RUN: Using cached contract data for {receipt.contract_id} (avoiding form fetch)")
@@ -462,11 +480,13 @@ class ReceiptProcessor:
                     logger.info(f"FETCHING RECEIPT FORM: Getting form data for contract {receipt.contract_id} (not in cache)")
                     success, form_data = self.web_client.get_receipt_form(receipt.contract_id)
                     if not success:
-                        logger.error(f"❌ FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
+                        logger.error(f"FORM DATA FAILED: Could not get receipt form for contract {receipt.contract_id}")
                         result.error_message = "Failed to get form data"
                         result.status = "Failed"
                         return result
-                    logger.info(f"✅ FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
+                    logger.info(f"FORM DATA SUCCESS: Retrieved form data for contract {receipt.contract_id}")
+            else:
+                logger.info(f"Using provided form_data with all required fields for contract {receipt.contract_id}")
             
             # Extract tenant information from form data
             if form_data:

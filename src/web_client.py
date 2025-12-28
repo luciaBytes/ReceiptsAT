@@ -13,9 +13,11 @@ from urllib.parse import urljoin, urlparse
 
 try:
     from .utils.logger import get_logger
+    from .utils.api_monitor import APIMonitor
 except ImportError:
     # Fallback for when imported directly
     from utils.logger import get_logger
+    from utils.api_monitor import APIMonitor
 
 logger = get_logger(__name__)
 
@@ -54,6 +56,9 @@ class WebClient:
         self.login_attempts = 0
         self.max_login_attempts = 3
         self._current_username = None  # Store username for 2FA verification
+        
+        # Initialize API monitor
+        self.api_monitor = APIMonitor()
         
         # Keep SSL verification enabled for security
         self.session.verify = True
@@ -1135,6 +1140,8 @@ class WebClient:
                             try:
                                 # Parse the full imoveis array as JSON
                                 imoveis_json = imoveis_match.group(1)
+                                logger.debug(f"Raw imoveis JSON (first 500 chars): {imoveis_json[:500]}")
+                                
                                 # Clean up the JSON
                                 imoveis_json = re.sub(r',\s*}', '}', imoveis_json)
                                 imoveis_json = re.sub(r',\s*]', ']', imoveis_json)
@@ -1148,15 +1155,18 @@ class WebClient:
                                     prop_address = prop.get('morada', 'N/A')
                                     prop_artigo = prop.get('artigo', 'N/A')
                                     prop_alternate_id = prop.get('alternateId', 'N/A')
-                                    logger.info(f"Property {i+1}: Address={prop_address[:50]}..., Artigo={prop_artigo}, AlternateId={prop_alternate_id}")
+                                    prop_codigo_postal = prop.get('codigoPostal', 'N/A')
+                                    logger.info(f"Property {i+1}: Address={prop_address[:50] if prop_address != 'N/A' else 'N/A'}..., Artigo={prop_artigo}, AlternateId={prop_alternate_id}, PostalCode={prop_codigo_postal}")
                                 
                                 # For backward compatibility, also set the first property's address
                                 if imoveis_array:
                                     contract_details['property_address'] = imoveis_array[0].get('morada', '')
-                                    logger.info(f"Primary property address: {contract_details['property_address'][:50]}...")
+                                    logger.info(f"Primary property address: {contract_details['property_address'][:50] if contract_details['property_address'] else 'N/A'}...")
                                     
                             except (json.JSONDecodeError, ValueError) as e:
-                                logger.warning(f"Failed to parse imoveis JSON, falling back to minimal structure: {e}")
+                                logger.error(f"Failed to parse imoveis JSON: {e}")
+                                logger.debug(f"Problematic JSON (first 1000 chars): {imoveis_json[:1000] if 'imoveis_json' in locals() else 'Not extracted'}")
+                                logger.warning("Falling back to minimal imoveis structure")
                                 
                                 # Fallback to extracting just the address
                                 imoveis_data = imoveis_match.group(1)
@@ -1282,6 +1292,14 @@ class WebClient:
             
             logger.info("📡 SUBMITTING RECEIPT TO PORTAL DAS FINANÇAS...")
             
+            # Validate payload before submission
+            self.api_monitor.validate_api_call(
+                endpoint='/arrendamento/api/emitirRecibo',
+                method='POST',
+                payload=payload,
+                contract_id=str(contract_id)
+            )
+            
             # Submit the receipt
             response = self.session.post(
                 api_url, 
@@ -1298,6 +1316,16 @@ class WebClient:
                 logger.info("✅ RECEIPT SUBMISSION: HTTP 200 OK - Processing response...")
                 try:
                     response_data = response.json()
+                    
+                    # Validate response structure
+                    self.api_monitor.validate_api_call(
+                        endpoint='/arrendamento/api/emitirRecibo',
+                        method='POST',
+                        payload=payload,
+                        response_status=200,
+                        response_data=response_data,
+                        contract_id=str(contract_id)
+                    )
                     
                     # Heavy logging for response analysis
                     logger.info("RESPONSE DATA ANALYSIS:")
@@ -1348,6 +1376,18 @@ class WebClient:
                             error_msg += f" Field errors: {'; '.join(error_details)}"
                         
                         logger.error("=" * 80)
+                        
+                        # Validate and log error
+                        self.api_monitor.validate_api_call(
+                            endpoint='/arrendamento/api/emitirRecibo',
+                            method='POST',
+                            payload=payload,
+                            response_status=200,
+                            response_data=response_data,
+                            error=error_msg,
+                            contract_id=str(contract_id)
+                        )
+                        
                         return False, {
                             'success': False,
                             'error': error_msg,
@@ -1393,6 +1433,16 @@ class WebClient:
                 logger.error(f"Response Preview: {response.text[:500]}")
                 logger.error("=" * 80)
                 
+                # Validate and log HTTP error
+                self.api_monitor.validate_api_call(
+                    endpoint='/arrendamento/api/emitirRecibo',
+                    method='POST',
+                    payload=payload,
+                    response_status=response.status_code,
+                    error=f"HTTP {response.status_code} error",
+                    contract_id=str(contract_id)
+                )
+                
                 return False, {
                     'success': False,
                     'error': f"HTTP {response.status_code} error",
@@ -1408,6 +1458,16 @@ class WebClient:
             logger.error(f"❌ Exception Type: {type(e).__name__}")
             logger.error(f"❌ Exception Message: {str(e)}")
             logger.error("=" * 80)
+            
+            # Validate and log exception
+            self.api_monitor.validate_api_call(
+                endpoint='/arrendamento/api/emitirRecibo',
+                method='POST',
+                payload=submission_data if 'submission_data' in locals() else None,
+                error=str(e),
+                contract_id=str(contract_id)
+            )
+            
             return False, {
                 'success': False,
                 'error': str(e)
