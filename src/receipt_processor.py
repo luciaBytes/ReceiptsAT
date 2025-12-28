@@ -97,10 +97,10 @@ class ReceiptProcessor:
                 else:
                     logger.warning(f"  Skipping contract with no 'numero' field: {contract.keys()}")
             
-            logger.info(f"✅ Cached {len(self._contracts_data_cache)} contracts with tenant data")
+            logger.info(f" Cached {len(self._contracts_data_cache)} contracts with tenant data")
             logger.info(f"   Cache keys (first 5): {list(self._contracts_data_cache.keys())[:5]}")
         else:
-            logger.error(f"❌ Failed to cache contract data - success: {validation_report.get('success')}, has data: {bool(validation_report.get('portal_contracts_data'))}")
+            logger.error(f" Failed to cache contract data - success: {validation_report.get('success')}, has data: {bool(validation_report.get('portal_contracts_data'))}")
         
         # Add detailed analysis
         validation_report['receipts_count'] = len(receipts)
@@ -326,7 +326,7 @@ class ReceiptProcessor:
                     contract_data = self._contracts_data_cache[contract_id_str]
                     rent_value = contract_data.get('valorRenda')
                     if rent_value:
-                        logger.info(f"✅ Using cached rent value from contract data: €{rent_value}")
+                        logger.info(f" Using cached rent value from contract data: €{rent_value}")
                 
                 # Only make API call if not found in cache
                 if not rent_value:
@@ -338,11 +338,11 @@ class ReceiptProcessor:
                 if rent_value and rent_value > 0.0:
                     receipt.value = rent_value
                     receipt.value_defaulted = True
-                    logger.info(f"✅ RENT VALUE DEFAULTING SUCCESS: €{rent_value} for contract {receipt.contract_id}")
+                    logger.info(f" RENT VALUE DEFAULTING SUCCESS: €{rent_value} for contract {receipt.contract_id}")
                 else:
                     # Keep value as 0.0 but ensure value_defaulted flag is set for display purposes
                     receipt.value_defaulted = True
-                    logger.error(f"❌ RENT VALUE DEFAULTING FAILED: No valorRenda available for contract {receipt.contract_id}")
+                    logger.error(f" RENT VALUE DEFAULTING FAILED: No valorRenda available for contract {receipt.contract_id}")
                     logger.error(f"   TROUBLESHOOTING: Check if contract {receipt.contract_id} exists in Portal das Finanças")
                     logger.error(f"   TROUBLESHOOTING: Check if contract has valid rent value in platform")
                     logger.error(f"   TROUBLESHOOTING: Check API response logs above for detailed error information")
@@ -449,7 +449,7 @@ class ReceiptProcessor:
                         result.error_message = "Failed to get form data"
                         result.status = "Failed"
                         return result
-                    logger.info(f"✅ FORM DATA SUCCESS: Retrieved complete form data for contract {receipt.contract_id}")
+                    logger.info(f" FORM DATA SUCCESS: Retrieved complete form data for contract {receipt.contract_id}")
                     
                     # Preserve tenant_name from preview if available
                     if form_data and 'tenant_name' in form_data:
@@ -798,7 +798,7 @@ class ReceiptProcessor:
         
         if missing_fields:
             logger.error("=" * 60)
-            logger.error("❌ CRITICAL: MISSING REQUIRED FIELDS!")
+            logger.error(" CRITICAL: MISSING REQUIRED FIELDS!")
             logger.error(f"Missing fields: {', '.join(missing_fields)}")
             logger.error(f"Form data keys available: {list(form_data.keys())}")
             logger.error("=" * 60)

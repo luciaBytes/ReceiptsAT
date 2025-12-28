@@ -522,22 +522,142 @@ def create_default_monitor() -> PortalAPIMonitor:
     return PortalAPIMonitor()
 
 
+class APIPayloadMonitor:
+    """
+    Lightweight API monitor - validates payloads and detects endpoint changes.
+    Does NOT record data, only validates and warns.
+    """
+    
+    def __init__(self):
+        """Initialize monitor without data persistence."""
+        self.known_endpoints = {
+            '/arrendamento/api/emitirRecibo': {
+                'method': 'POST',
+                'required_fields': [
+                    'numContrato', 'versaoContrato', 'nifEmitente', 'nomeEmitente',
+                    'valor', 'tipoContrato', 'locadores', 'locatarios', 'imoveis',
+                    'dataInicio', 'dataFim', 'dataRecebimento', 'tipoImportancia'
+                ]
+            },
+            '/arrendamento/api/obterElementosContratosEmissaoRecibos/locador': {
+                'method': 'GET',
+                'required_fields': []
+            },
+            '/arrendamento/criarRecibo': {
+                'method': 'GET',
+                'required_fields': []
+            }
+        }
+    
+    def validate_api_call(self, endpoint: str, method: str, payload: Dict = None,
+                         response_status: int = None, response_data: Any = None,
+                         error: str = None, contract_id: str = None):
+        """
+        Validate API call and warn about issues.
+        Does NOT persist data, only validates and logs warnings.
+        
+        Args:
+            endpoint: API endpoint path
+            method: HTTP method
+            payload: Request payload
+            response_status: HTTP status code
+            response_data: Response data
+            error: Error message if failed
+            contract_id: Contract ID for context
+        """
+        # Check if endpoint is known
+        if endpoint not in self.known_endpoints:
+            logger.warning(f" UNKNOWN ENDPOINT: {method} {endpoint}")
+            logger.warning(f"   This endpoint is not in the known list - API may have changed!")
+            return
+        
+        endpoint_info = self.known_endpoints[endpoint]
+        
+        # Check if method matches
+        if method != endpoint_info['method']:
+            logger.warning(f" METHOD CHANGED: {endpoint}")
+            logger.warning(f"   Expected: {endpoint_info['method']}, Got: {method}")
+        
+        # Validate payload if present
+        if payload and endpoint_info['required_fields']:
+            missing = self._check_required_fields(endpoint, payload)
+            if missing:
+                logger.error(f"MISSING REQUIRED FIELDS in {endpoint}:")
+                for field in missing:
+                    logger.error(f"   • {field}")
+                logger.error(f"   Contract ID: {contract_id}")
+                logger.error(f"   This will likely cause submission to fail!")
+        
+        # Detect endpoint deprecation or errors
+        if response_status and response_status == 404:
+            logger.error(f"ENDPOINT NOT FOUND: {endpoint}")
+            logger.error(f"   The API endpoint may have been removed or moved!")
+        elif response_status and response_status == 410:
+            logger.error(f"ENDPOINT DEPRECATED: {endpoint}")
+            logger.error(f"   This endpoint is no longer supported!")
+        elif response_status and response_status >= 500:
+            logger.error(f"SERVER ERROR on {endpoint}: HTTP {response_status}")
+            if error:
+                logger.error(f"   Error: {error}")
+    
+    def _check_required_fields(self, endpoint: str, payload: Dict) -> List[str]:
+        """Check if required fields are present in payload."""
+        if endpoint not in self.known_endpoints:
+            return []
+        
+        required_fields = self.known_endpoints[endpoint]['required_fields']
+        missing = []
+        
+        # Check top-level fields
+        for field in required_fields:
+            if field not in payload or payload[field] is None:
+                missing.append(field)
+        
+        # Check nested required fields for receipt submission
+        if endpoint == '/arrendamento/api/emitirRecibo':
+            # Check locadores NIFs
+            if 'locadores' in payload and payload['locadores']:
+                for i, locador in enumerate(payload['locadores']):
+                    if 'nif' not in locador or locador['nif'] is None:
+                        missing.append(f'locadores[{i}].nif')
+            
+            # Check locatarios NIFs
+            if 'locatarios' in payload and payload['locatarios']:
+                for i, locatario in enumerate(payload['locatarios']):
+                    if 'nif' not in locatario or locatario['nif'] is None:
+                        missing.append(f'locatarios[{i}].nif')
+            
+            # Check imoveis data
+            if 'imoveis' in payload and payload['imoveis']:
+                for i, imovel in enumerate(payload['imoveis']):
+                    if 'morada' not in imovel or not imovel['morada']:
+                        missing.append(f'imoveis[{i}].morada')
+            elif 'imoveis' not in payload or not payload['imoveis']:
+                missing.append('imoveis (array is empty or missing)')
+        
+        return missing
+
+
+# For backward compatibility, use APIPayloadMonitor as default
+APIMonitor = APIPayloadMonitor
+
+
 if __name__ == "__main__":
     # Demo usage
     monitor = create_default_monitor()
     
-    print("🔍 Portal das Finanças API Monitor Demo")
+    print(" Portal das Finanças API Monitor Demo")
     print("=" * 50)
     
     if monitor.should_run_check():
-        print("⏰ Running scheduled monitoring check...")
+        print(" Running scheduled monitoring check...")
         snapshots, changes = monitor.monitor_all_pages()
         
-        print(f"📊 Captured {len(snapshots)} snapshots")
-        print(f"🔄 Detected {len(changes)} changes")
+        print(f" Captured {len(snapshots)} snapshots")
+        print(f" Detected {len(changes)} changes")
         
         if changes:
-            print("\n⚠️ Recent Changes:")
+            print("\n Recent Changes:")
             for change in changes:
                 print(f"  {change.severity.upper()}: {change.description}")
     else:
@@ -545,7 +665,7 @@ if __name__ == "__main__":
     
     # Generate report
     report = monitor.generate_monitoring_report()
-    print(f"\n📈 Monitoring Report:")
+    print(f"\n Monitoring Report:")
     print(f"  Total pages monitored: {report['total_pages_monitored']}")
     print(f"  Total changes detected: {report['total_changes_detected']}")
     print(f"  Critical changes: {report['critical_changes_total']}")
