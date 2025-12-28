@@ -200,48 +200,49 @@ class ReceiptProcessor:
         logger.info(f"Starting step-by-step processing of {len(receipts)} receipts")
         self.results.clear()
         
-        # In dry run mode, skip contract validation
-        if not self.dry_run:
-            # First, validate contracts to identify invalid ones (same as bulk mode)
-            validation_report = self.validate_contracts(receipts)
+        # ALWAYS validate contracts to filter out invalid ones (even in dry run mode)
+        # This ensures invalid contracts are not shown in step-by-step confirmation
+        validation_report = self.validate_contracts(receipts)
+        
+        if not validation_report['success']:
+            logger.error("Contract validation failed - stopping processing")
+            # Create error results for all receipts
+            for receipt in receipts:
+                error_result = ProcessingResult(
+                    contract_id=receipt.contract_id,
+                    success=False,
+                    error_message=f"Contract validation failed: {validation_report['message']}",
+                    timestamp=datetime.now().isoformat(),
+                    status="Failed"
+                )
+                self.results.append(error_result)
+            return self.results.copy()
+        
+        # Filter out invalid contracts BEFORE step-by-step processing
+        # This applies to both normal and dry run modes
+        if validation_report['invalid_contracts']:
+            logger.warning(f"Found {len(validation_report['invalid_contracts'])} invalid contracts")
             
-            if not validation_report['success']:
-                logger.error("Contract validation failed - stopping processing")
-                # Create error results for all receipts
-                for receipt in receipts:
+            invalid_contracts_set = set(validation_report['invalid_contracts'])
+            
+            # Create "Skipped" results for invalid contracts (logged but not presented)
+            for receipt in receipts:
+                if receipt.contract_id in invalid_contracts_set:
                     error_result = ProcessingResult(
                         contract_id=receipt.contract_id,
                         success=False,
-                        error_message=f"Contract validation failed: {validation_report['message']}",
+                        error_message=f"Contract ID '{receipt.contract_id}' not found in Portal das Finanças",
                         timestamp=datetime.now().isoformat(),
-                        status="Failed"
+                        status="Skipped"
                     )
                     self.results.append(error_result)
-                return self.results.copy()
+                    logger.warning(f"Skipping invalid contract: {receipt.contract_id}")
             
-            # Create error results for invalid contracts (same as bulk mode)
-            if validation_report['invalid_contracts']:
-                logger.warning(f"Found {len(validation_report['invalid_contracts'])} invalid contracts")
-                
-                invalid_contracts_set = set(validation_report['invalid_contracts'])
-                for receipt in receipts:
-                    if receipt.contract_id in invalid_contracts_set:
-                        error_result = ProcessingResult(
-                            contract_id=receipt.contract_id,
-                            success=False,
-                            error_message=f"Contract ID '{receipt.contract_id}' not found in Portal das Finanças",
-                            timestamp=datetime.now().isoformat(),
-                            status="Skipped"
-                        )
-                        self.results.append(error_result)
-                        logger.warning(f"Skipping receipt for invalid contract: {receipt.contract_id}")
-                
-                # Filter out invalid contracts from processing (only process valid ones)
-                valid_receipts = [r for r in receipts if r.contract_id not in invalid_contracts_set]
-                logger.info(f"Step-by-step processing {len(valid_receipts)} receipts with valid contracts (skipping {len(receipts) - len(valid_receipts)})")
-                receipts = valid_receipts
-        else:
-            logger.info("Dry run mode: Skipping contract validation")
+            # Filter receipts to only include valid contracts
+            valid_receipts = [r for r in receipts if r.contract_id not in invalid_contracts_set]
+            mode = "dry run" if self.dry_run else "production"
+            logger.info(f"Step-by-step ({mode}): Processing {len(valid_receipts)} valid contracts, skipping {len(receipts) - len(valid_receipts)} invalid")
+            receipts = valid_receipts
         
         for receipt in receipts:
             # Check if stop was requested
