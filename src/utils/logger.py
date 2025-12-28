@@ -17,6 +17,17 @@ def setup_logger(log_level: int = logging.INFO) -> logging.Logger:
     Returns:
         Configured logger
     """
+    # Get or create the logger
+    logger = logging.getLogger('receipts_app')
+    
+    # If logger already has handlers, it's already configured - don't add duplicates
+    if logger.handlers:
+        logger.info("Logger already configured, skipping setup")
+        return logger
+    
+    # Set the logging level
+    logger.setLevel(log_level)
+    
     # Create logs directory if it doesn't exist - go up two levels from src/utils to root
     log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
     os.makedirs(log_dir, exist_ok=True)
@@ -25,17 +36,25 @@ def setup_logger(log_level: int = logging.INFO) -> logging.Logger:
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_file = os.path.join(log_dir, f'receipts_{timestamp}.log')
     
-    # Configure logging
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    logger = logging.getLogger('receipts_app')
+    # Create file handler
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(log_level)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Keep propagation enabled so GUI handler on this logger catches child logger messages
+    # Child loggers will propagate to this parent logger
+    logger.propagate = False  # But don't propagate to root logger
+    
     logger.info(f"Logger initialized. Log file: {log_file}")
     
     return logger
