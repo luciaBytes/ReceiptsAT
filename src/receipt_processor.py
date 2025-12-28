@@ -45,6 +45,7 @@ class ReceiptProcessor:
         self.web_client = web_client
         self.results: List[ProcessingResult] = []
         self.dry_run = False
+        self._contracts_data_cache: Dict[str, Dict] = {}  # Cache contract data from validation
     
     def set_dry_run(self, dry_run: bool):
         """Enable or disable dry run mode."""
@@ -76,6 +77,30 @@ class ReceiptProcessor:
         
         # Validate contracts using WebClient
         validation_report = self.web_client.validate_csv_contracts(csv_contract_ids)
+        
+        # Cache contract data with tenant information for later use
+        logger.info(f"Validation report success: {validation_report.get('success')}")
+        logger.info(f"Portal contracts data available: {bool(validation_report.get('portal_contracts_data'))}")
+        
+        if validation_report.get('success') and validation_report.get('portal_contracts_data'):
+            self._contracts_data_cache.clear()
+            portal_contracts = validation_report['portal_contracts_data']
+            logger.info(f"Attempting to cache {len(portal_contracts)} contracts")
+            
+            for contract in portal_contracts:
+                contract_id = str(contract.get('numero', ''))
+                if contract_id:
+                    locatarios = contract.get('locatarios', [])
+                    tenant_names = [t.get('nome', '') for t in locatarios] if locatarios else []
+                    logger.info(f"  Caching contract {contract_id} with {len(locatarios)} tenants: {tenant_names[:2]}")
+                    self._contracts_data_cache[contract_id] = contract
+                else:
+                    logger.warning(f"  Skipping contract with no 'numero' field: {contract.keys()}")
+            
+            logger.info(f"✅ Cached {len(self._contracts_data_cache)} contracts with tenant data")
+            logger.info(f"   Cache keys (first 5): {list(self._contracts_data_cache.keys())[:5]}")
+        else:
+            logger.error(f"❌ Failed to cache contract data - success: {validation_report.get('success')}, has data: {bool(validation_report.get('portal_contracts_data'))}")
         
         # Add detailed analysis
         validation_report['receipts_count'] = len(receipts)
@@ -200,48 +225,47 @@ class ReceiptProcessor:
         logger.info(f"Starting step-by-step processing of {len(receipts)} receipts")
         self.results.clear()
         
-        # In dry run mode, skip contract validation
-        if not self.dry_run:
-            # First, validate contracts to identify invalid ones (same as bulk mode)
-            validation_report = self.validate_contracts(receipts)
+        # ALWAYS validate contracts to:
+        # 1. Filter out invalid contracts (even in dry run)
+        # 2. Populate cache with tenant data (needed for display)
+        validation_report = self.validate_contracts(receipts)
+        
+        if not validation_report['success']:
+            logger.error("Contract validation failed - stopping processing")
+            # Create error results for all receipts
+            for receipt in receipts:
+                error_result = ProcessingResult(
+                    contract_id=receipt.contract_id,
+                    success=False,
+                    error_message=f"Contract validation failed: {validation_report['message']}",
+                    timestamp=datetime.now().isoformat(),
+                    status="Failed"
+                )
+                self.results.append(error_result)
+            return self.results.copy()
+        
+        # Filter out invalid contracts BEFORE processing (applies to both dry run and production)
+        if validation_report['invalid_contracts']:
+            logger.warning(f"Found {len(validation_report['invalid_contracts'])} invalid contracts")
             
-            if not validation_report['success']:
-                logger.error("Contract validation failed - stopping processing")
-                # Create error results for all receipts
-                for receipt in receipts:
+            invalid_contracts_set = set(validation_report['invalid_contracts'])
+            for receipt in receipts:
+                if receipt.contract_id in invalid_contracts_set:
                     error_result = ProcessingResult(
                         contract_id=receipt.contract_id,
                         success=False,
-                        error_message=f"Contract validation failed: {validation_report['message']}",
+                        error_message=f"Contract ID '{receipt.contract_id}' not found in Portal das Finanças",
                         timestamp=datetime.now().isoformat(),
-                        status="Failed"
+                        status="Skipped"
                     )
                     self.results.append(error_result)
-                return self.results.copy()
+                    logger.warning(f"Skipping receipt for invalid contract: {receipt.contract_id}")
             
-            # Create error results for invalid contracts (same as bulk mode)
-            if validation_report['invalid_contracts']:
-                logger.warning(f"Found {len(validation_report['invalid_contracts'])} invalid contracts")
-                
-                invalid_contracts_set = set(validation_report['invalid_contracts'])
-                for receipt in receipts:
-                    if receipt.contract_id in invalid_contracts_set:
-                        error_result = ProcessingResult(
-                            contract_id=receipt.contract_id,
-                            success=False,
-                            error_message=f"Contract ID '{receipt.contract_id}' not found in Portal das Finanças",
-                            timestamp=datetime.now().isoformat(),
-                            status="Skipped"
-                        )
-                        self.results.append(error_result)
-                        logger.warning(f"Skipping receipt for invalid contract: {receipt.contract_id}")
-                
-                # Filter out invalid contracts from processing (only process valid ones)
-                valid_receipts = [r for r in receipts if r.contract_id not in invalid_contracts_set]
-                logger.info(f"Step-by-step processing {len(valid_receipts)} receipts with valid contracts (skipping {len(receipts) - len(valid_receipts)})")
-                receipts = valid_receipts
-        else:
-            logger.info("Dry run mode: Skipping contract validation")
+            # Filter out invalid contracts from processing (only process valid ones)
+            valid_receipts = [r for r in receipts if r.contract_id not in invalid_contracts_set]
+            mode = "dry run" if self.dry_run else "production"
+            logger.info(f"Step-by-step ({mode}): Processing {len(valid_receipts)} receipts with valid contracts (skipping {len(receipts) - len(valid_receipts)})")
+            receipts = valid_receipts
         
         for receipt in receipts:
             # Check if stop was requested
@@ -249,21 +273,51 @@ class ReceiptProcessor:
                 logger.info("Step-by-step processing stopped by user request")
                 break
                 
-            # Always try to get real form data (even in dry run)
-            # In dry run mode, we want real data but no submission
-            form_data = None
-            success = True  # Assume success for now
+            # Get tenant information from cached contract data (no additional API call)
+            form_data = {}
+            tenant_name = None
             
-            if not success:
-                result = ProcessingResult(
-                    contract_id=receipt.contract_id,
-                    success=False,
-                    error_message="Failed to get form data",
-                    timestamp=datetime.now().isoformat(),
-                    status="Failed"
-                )
-                self.results.append(result)
-                continue
+            contract_id_str = str(receipt.contract_id)
+            logger.info(f"Looking up tenant for contract {contract_id_str} in cache (cache size: {len(self._contracts_data_cache)})")
+            
+            if contract_id_str in self._contracts_data_cache:
+                contract_data = self._contracts_data_cache[contract_id_str]
+                
+                # Try to get tenant name from either locatarios array OR nomeLocatario field
+                tenant_name = None
+                locatarios = contract_data.get('locatarios', [])
+                
+                if locatarios:
+                    # Has locatarios array
+                    logger.info(f"Found contract {contract_id_str} in cache with {len(locatarios)} tenant(s) in array")
+                    if len(locatarios) == 1:
+                        tenant_name = locatarios[0].get('nome', '').strip()
+                    else:
+                        # Multiple tenants - show first name + count
+                        names = [t.get('nome', '').strip() for t in locatarios if t.get('nome', '').strip()]
+                        if names:
+                            if len(names) == 1:
+                                tenant_name = names[0]
+                            else:
+                                tenant_name = f"{names[0]} +{len(names)-1}"
+                elif contract_data.get('nomeLocatario'):
+                    # Has nomeLocatario field (string)
+                    tenant_name = contract_data.get('nomeLocatario', '').strip()
+                    logger.info(f"Found contract {contract_id_str} in cache with tenant from nomeLocatario: {tenant_name}")
+                else:
+                    logger.warning(f"Contract {contract_id_str} found in cache but has no tenant data")
+                
+                if tenant_name:
+                    form_data['tenant_name'] = tenant_name
+                    logger.info(f"Using cached tenant for contract {receipt.contract_id}: {tenant_name}")
+                else:
+                    logger.warning(f"Contract {contract_id_str} has locatarios but no valid names")
+            else:
+                logger.warning(f"Contract {contract_id_str} NOT found in cache. Cache keys: {list(self._contracts_data_cache.keys())[:5]}")
+            
+            # Ensure form_data is always a dict for the callback
+            if not form_data:
+                form_data = {}
             
             # Update receipt value with contract data if needed (before showing confirmation dialog)
             if receipt.value == -1.0 or receipt.value == 0.0:  # Handle both old 0.0 and new -1.0 indicators
@@ -301,8 +355,15 @@ class ReceiptProcessor:
                     logger.error(f"   TROUBLESHOOTING: Check if contract has valid rent value in platform")
                     logger.error(f"   TROUBLESHOOTING: Check API response logs above for detailed error information")
             
+            # Log form_data before callback
+            logger.info(f"Before confirmation callback - form_data keys: {list(form_data.keys())}")
+            if 'tenant_name' in form_data:
+                logger.info(f"  tenant_name in form_data: '{form_data['tenant_name']}'")
+            else:
+                logger.warning(f"  tenant_name NOT in form_data!")
+            
             # Ask user for confirmation
-            action = confirmation_callback(receipt, form_data or {})
+            action = confirmation_callback(receipt, form_data)
             
             if action == 'cancel':
                 logger.info("Processing cancelled by user")
