@@ -214,8 +214,11 @@ class MainWindow:
         log_frame.rowconfigure(0, weight=1)
         main_frame.rowconfigure(6, weight=1)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80)
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80, wrap=tk.WORD)
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Set up custom log handler to capture all logs
+        self._setup_log_handler()
         
         # Version info at bottom
         version_frame = ttk.Frame(main_frame)
@@ -226,6 +229,55 @@ class MainWindow:
         version_label.pack(side=tk.LEFT)
         
         # Don't test connection on startup - wait for user to click login
+    
+    def _setup_log_handler(self):
+        """Set up a custom log handler to capture all logs and display in GUI."""
+        class GUILogHandler(logging.Handler):
+            def __init__(self, text_widget, root):
+                super().__init__()
+                self.text_widget = text_widget
+                self.root = root
+                
+            def emit(self, record):
+                try:
+                    msg = self.format(record)
+                    # Schedule update on main thread
+                    self.root.after(0, lambda: self._append_log(msg))
+                except Exception:
+                    self.handleError(record)
+            
+            def _append_log(self, msg):
+                try:
+                    self.text_widget.insert(tk.END, msg + '\n')
+                    self.text_widget.see(tk.END)
+                    # Keep only last 1000 lines to prevent memory issues
+                    lines = int(self.text_widget.index('end-1c').split('.')[0])
+                    if lines > 1000:
+                        self.text_widget.delete('1.0', f'{lines-1000}.0')
+                except Exception:
+                    pass
+        
+        # Create and configure the handler
+        gui_handler = GUILogHandler(self.log_text, self.root)
+        gui_handler.setLevel(logging.DEBUG)  # Capture all levels
+        
+        # Use a detailed formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        gui_handler.setFormatter(formatter)
+        
+        # Add handler to root logger to capture all logs
+        root_logger = logging.getLogger()
+        root_logger.addHandler(gui_handler)
+        
+        # Also add to specific loggers
+        for logger_name in ['receipts_app', 'receipts_app.web_client', 
+                           'receipts_app.receipt_processor', 'receipts_app.gui.main_window']:
+            logger_obj = logging.getLogger(logger_name)
+            if gui_handler not in logger_obj.handlers:
+                logger_obj.addHandler(gui_handler)
     
     def _create_tooltip(self, widget, text):
         """Create a tooltip for a widget."""
@@ -403,6 +455,12 @@ class MainWindow:
             self.login_button.config(state="disabled")
             self.logout_button.config(state="normal")
             
+            # Reload CSV file if one was previously selected
+            csv_path = self.csv_file_path.get()
+            if csv_path:
+                self.log("INFO", f"Reloading CSV file for new account: {csv_path}")
+                self._validate_csv_file(csv_path)
+            
             self._update_start_button_state()
             
             # Start periodic session check
@@ -467,6 +525,13 @@ class MainWindow:
             
             # Clear password field for security
             self.password_entry.delete(0, tk.END)
+            
+            # Clear session-derived data (keep file selection for reload on next login)
+            self.csv_handler.clear_data()
+            self.processor.results.clear()
+            self.progress_var.set(0)
+            self.status_var.set(get_text('STATUS_READY'))
+            self.log("INFO", "Cleared session-derived data for account switch")
             
             # Update start button state
             self._update_start_button_state()
@@ -902,21 +967,15 @@ class MainWindow:
                 messagebox.showerror(get_text('EXPORT_FAILED_TITLE'), get_text('EXPORT_REPORT_FAILED_MESSAGE'))
     
     def log(self, level: str, message: str):
-        """Add a log entry to the GUI."""
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        log_entry = f"[{timestamp}] {level}: {message}\n"
-        
-        self.log_text.insert(tk.END, log_entry)
-        self.log_text.see(tk.END)
-        
-        # Also log to the logger
+        """Add a log entry - now just logs to logger which is captured by GUI handler."""
         if level == "INFO":
             logger.info(message)
         elif level == "ERROR":
             logger.error(message)
         elif level == "WARNING":
             logger.warning(message)
+        else:
+            logger.debug(message)
     
     def _show_step_confirmation_dialog(self, receipt_data, form_data):
         """Show confirmation dialog for step-by-step processing."""
@@ -941,14 +1000,28 @@ class MainWindow:
         info_frame = ttk.LabelFrame(main_frame, text="Receipt Information", padding="10")
         info_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Create a frame for contract ID
+        # Create a frame for contract ID and tenant name
         contract_frame = ttk.Frame(info_frame)
         contract_frame.pack(fill=tk.X, pady=2)
         
         # Contract ID with selectable text
         ttk.Label(contract_frame, text="Contract ID:").pack(side=tk.LEFT)
-        contract_var = tk.StringVar(value=str(receipt_data.contract_id))
-        contract_entry = ttk.Entry(contract_frame, textvariable=contract_var, state='readonly', width=15)
+        
+        # Get tenant name from form_data if available
+        tenant_name = form_data.get('tenant_name', '') if form_data else ''
+        contract_display = str(receipt_data.contract_id)
+        if tenant_name:
+            contract_display = f"{receipt_data.contract_id} - {tenant_name}"
+        
+        # Debug logging
+        logger.info(f"Step confirmation dialog - Contract: {receipt_data.contract_id}")
+        logger.info(f"  form_data type: {type(form_data)}, is None: {form_data is None}")
+        logger.info(f"  form_data keys: {list(form_data.keys()) if form_data else 'None'}")
+        logger.info(f"  tenant_name from form_data: '{tenant_name}'")
+        logger.info(f"  contract_display: '{contract_display}'")
+        
+        contract_var = tk.StringVar(value=contract_display)
+        contract_entry = ttk.Entry(contract_frame, textvariable=contract_var, state='readonly', width=50)
         contract_entry.pack(side=tk.LEFT, padx=(5, 5))
         
         # Period information (selectable)
@@ -1001,27 +1074,16 @@ class MainWindow:
         if hasattr(receipt_data, 'receipt_type_defaulted') and receipt_data.receipt_type_defaulted:
             ttk.Label(receipt_type_frame, text="(defaulted)", foreground='orange').pack(side=tk.LEFT)
         
-        # Contract information (if available)
+        # Contract information (if available) - removed tenant display here as it's now shown with contract ID
         if form_data and not form_data.get('mock'):
-            contract_info_frame = ttk.LabelFrame(main_frame, text="Contract Information", padding="10")
-            contract_info_frame.pack(fill=tk.X, pady=(0, 10))
-            
-            # Extract contract info for display
             contract_details = form_data.get('contract_details', {})
-            tenants = contract_details.get('locatarios', [])
             landlords = contract_details.get('locadores', [])
+            property_address = contract_details.get('property_address', 'Not available')
             
-            if tenants:
-                tenant_names = [t.get('nome', 'Unknown') for t in tenants]
-                tenant_text = ', '.join(tenant_names)
-                
-                tenant_frame = ttk.Frame(contract_info_frame)
-                tenant_frame.pack(fill=tk.X, pady=2)
-                
-                ttk.Label(tenant_frame, text="Tenants:").pack(side=tk.LEFT)
-                tenant_var = tk.StringVar(value=tenant_text)
-                tenant_entry = ttk.Entry(tenant_frame, textvariable=tenant_var, state='readonly', width=40)
-                tenant_entry.pack(side=tk.LEFT, padx=(5, 5))
+            # Only show contract info frame if there's additional info beyond tenant name
+            if landlords or property_address != 'Not available':
+                contract_info_frame = ttk.LabelFrame(main_frame, text="Contract Information", padding="10")
+                contract_info_frame.pack(fill=tk.X, pady=(0, 10))
             
             if landlords:
                 landlord_names = [l.get('nome', 'Unknown') for l in landlords]

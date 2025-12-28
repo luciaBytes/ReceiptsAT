@@ -436,6 +436,18 @@ class CSVHandler:
         """Get the list of loaded receipts."""
         return self.receipts.copy()
     
+    def clear_data(self):
+        """Clear all loaded CSV data."""
+        self.receipts = []
+        self.validation_errors = []
+        self.column_mapping = {}
+        if self.temp_csv_file and os.path.exists(self.temp_csv_file):
+            try:
+                os.remove(self.temp_csv_file)
+            except:
+                pass
+        self.temp_csv_file = None
+    
     def filter_receipts_by_contracts(self, valid_contract_ids: List[str]) -> int:
         """
         Filter receipts to only include those with valid contract IDs.

@@ -13,11 +13,28 @@ from csv_handler import CSVHandler
 from web_client import WebClient
 from receipt_processor import ReceiptProcessor
 
+@patch.object(WebClient, 'validate_csv_contracts')
 @patch.object(WebClient, 'get_contract_rent_value')
-def test_step_by_step_value_update(mock_get_rent_value):
+@patch.object(WebClient, 'is_authenticated')
+def test_step_by_step_value_update(mock_is_authenticated, mock_get_rent_value, mock_validate_contracts):
     """Test that values are updated from contract data before showing confirmation dialog."""
     
     print("=== Testing Step-by-Step Value Update ===\n")
+    
+    # Mock authentication
+    mock_is_authenticated.return_value = True
+    
+    # Mock contract validation to return success with valid contracts
+    mock_validate_contracts.return_value = {
+        'success': True,
+        'portal_contracts_count': 2,
+        'csv_contracts_count': 2,
+        'valid_contracts': ['12345', '67890'],
+        'valid_contracts_data': [],
+        'invalid_contracts': [],
+        'missing_from_csv': [],
+        'validation_errors': []
+    }
     
     # Mock rent value retrieval to return test values
     def mock_rent_value(contract_id):
