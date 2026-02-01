@@ -316,11 +316,11 @@ class EnhancedProgressBar:
         """Set the progress bar to completion state."""
         if success:
             self.progress_var.set(100)
-            self.status_var.set("✅ " + message)
+            self.status_var.set(" " + message)
             self.detail_var.set("")
             self.time_var.set("")
         else:
-            self.status_var.set("❌ " + message)
+            self.status_var.set(" " + message)
             
         # Hide pause button, show only details
         self.pause_button.pack_forget()
@@ -468,7 +468,7 @@ Tempo médio por operação: {summary['average_time_per_operation']:.2f}s
 """
         
         for result in summary['results']:
-            status_icon = "✅" if result.status == OperationStatus.COMPLETED else "❌"
+            status_icon = "" if result.status == OperationStatus.COMPLETED else ""
             details_text += f"{status_icon} {result.operation_id}: {result.message}"
             if result.duration:
                 details_text += f" ({result.duration:.2f}s)"

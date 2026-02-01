@@ -412,7 +412,7 @@ def main():
     
     print(f"Template generation: {message}")
     for filename, result in results.items():
-        status = "✅" if result else "❌"
+        status = "" if result else ""
         print(f"  {status} {filename}")
     
     # Generate help file

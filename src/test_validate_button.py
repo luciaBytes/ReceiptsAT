@@ -26,7 +26,7 @@ def test_validate_button_functionality():
     # Step 1: Mock login
     print("1. Testing authentication...")
     login_success, login_message = web_client.login("demo", "demo")
-    print(f"   Login: {'✅ Success' if login_success else '❌ Failed'} - {login_message}")
+    print(f"   Login: {' Success' if login_success else ' Failed'} - {login_message}")
     
     if not login_success:
         print("Cannot proceed without authentication")
@@ -50,7 +50,7 @@ def test_validate_button_functionality():
     # Step 3: Load CSV
     print("\n3. Loading CSV...")
     csv_success, csv_errors = csv_handler.load_csv(csv_file)
-    print(f"   CSV loading: {'✅ Success' if csv_success else '❌ Failed'}")
+    print(f"   CSV loading: {' Success' if csv_success else ' Failed'}")
     
     if csv_errors:
         for error in csv_errors:
@@ -60,38 +60,38 @@ def test_validate_button_functionality():
     print(f"   Loaded {len(receipts)} receipts")
     
     # Step 4: Simulate what happens when user clicks "Validate Contracts" button
-    print(f"\n4. 🔍 SIMULATING 'VALIDATE CONTRACTS' BUTTON CLICK...")
+    print(f"\n4.  SIMULATING 'VALIDATE CONTRACTS' BUTTON CLICK...")
     print("   This is exactly what happens when the user clicks the validation button:")
     
     # This is the same call made by the GUI validation button
     validation_report = processor.validate_contracts(receipts)
     
     # Step 5: Display results exactly as shown in the GUI popup
-    print(f"\n5. 📊 VALIDATION RESULTS (as shown in GUI popup):")
+    print(f"\n5.  VALIDATION RESULTS (as shown in GUI popup):")
     
     message_parts = []
-    message_parts.append(f"📊 VALIDATION SUMMARY:")
+    message_parts.append(f" VALIDATION SUMMARY:")
     message_parts.append(f"Portal contracts: {validation_report['portal_contracts_count']}")
     message_parts.append(f"CSV contracts: {validation_report['csv_contracts_count']}")
     message_parts.append(f"Valid matches: {len(validation_report['valid_contracts'])}")
     
     if validation_report['valid_contracts']:
-        message_parts.append(f"\n✅ VALID CONTRACTS:")
+        message_parts.append(f"\n VALID CONTRACTS:")
         for contract in validation_report['valid_contracts']:
             message_parts.append(f"  • {contract}")
     
     if validation_report['invalid_contracts']:
-        message_parts.append(f"\n❌ INVALID CONTRACTS (not found in portal):")
+        message_parts.append(f"\n INVALID CONTRACTS (not found in portal):")
         for contract in validation_report['invalid_contracts']:
             message_parts.append(f"  • {contract}")
     
     if validation_report['missing_from_csv']:
-        message_parts.append(f"\n⚠️ PORTAL CONTRACTS NOT IN CSV:")
+        message_parts.append(f"\n PORTAL CONTRACTS NOT IN CSV:")
         for contract in validation_report['missing_from_csv']:
             message_parts.append(f"  • {contract}")
     
     if validation_report['validation_errors']:
-        message_parts.append(f"\n🔍 VALIDATION ISSUES:")
+        message_parts.append(f"\n VALIDATION ISSUES:")
         for error in validation_report['validation_errors']:
             message_parts.append(f"  • {error}")
     
@@ -101,10 +101,10 @@ def test_validate_button_functionality():
     
     # Step 6: Show button behavior
     print(f"\n6. 🔘 BUTTON BEHAVIOR:")
-    print(f"   ✅ Button enabled when: Authenticated + CSV loaded")
-    print(f"   ❌ Button disabled when: Not authenticated OR no CSV")
-    print(f"   📊 Button shows: Detailed popup with validation results")
-    print(f"   🔄 Processing: Button disabled during validation, re-enabled after")
+    print(f"    Button enabled when: Authenticated + CSV loaded")
+    print(f"    Button disabled when: Not authenticated OR no CSV")
+    print(f"    Button shows: Detailed popup with validation results")
+    print(f"    Processing: Button disabled during validation, re-enabled after")
     
     # Cleanup
     try:
@@ -114,7 +114,7 @@ def test_validate_button_functionality():
         pass
     
     print(f"\n🎉 Validate Contracts button test completed!")
-    print(f"\n📝 SUMMARY:")
+    print(f"\n SUMMARY:")
     print(f"   The 'Validate Contracts' button provides users with:")
     print(f"   • Immediate contract validation without starting processing")
     print(f"   • Clear identification of valid vs invalid contracts")
