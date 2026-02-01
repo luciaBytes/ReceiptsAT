@@ -1,0 +1,19 @@
+[run]
+branch = True
+source = src
+omit =
+    tests/*
+    sample/*
+    build/*
+    assets/*
+    src/gui/*
+    src/main.py
+
+[report]
+exclude_lines =
+    # Don't count pragma no cover lines
+    pragma: no cover
+    # Exclude CLI entrypoints
+    if __name__ == "__main__"
+    # Generated or simple dataclass lines
+    @dataclass

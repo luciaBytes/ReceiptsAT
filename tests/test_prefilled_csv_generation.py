@@ -4,8 +4,13 @@ Test pre-filled CSV generation functionality
 import pytest
 import tempfile
 import os
+import sys
 from unittest.mock import Mock, patch
-from src.web_client import WebClient
+
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from web_client import WebClient
 
 
 class TestPrefilledCSVGeneration:

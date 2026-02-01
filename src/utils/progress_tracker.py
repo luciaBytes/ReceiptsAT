@@ -115,11 +115,13 @@ class ProgressTracker:
         
         if processed_operations > 0 and self.start_time is not None:
             elapsed_time = time.time() - self.start_time
-            operations_per_second = processed_operations / elapsed_time
-            
-            remaining_operations = self.total_operations - processed_operations
-            if operations_per_second > 0:
-                estimated_time_remaining = remaining_operations / operations_per_second
+            # Prevent division by zero in fast operations or unit tests
+            if elapsed_time > 0:
+                operations_per_second = processed_operations / elapsed_time
+                
+                remaining_operations = self.total_operations - processed_operations
+                if operations_per_second > 0:
+                    estimated_time_remaining = remaining_operations / operations_per_second
                 
         # Create status message
         message = f"Processando: {processed_operations}/{self.total_operations}"

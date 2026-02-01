@@ -216,6 +216,19 @@ class MultilingualTexts:
     }
     
     # ==============================================
+    # SMART IMPORT TAB INTERFACE
+    # ==============================================
+    
+    SMART_IMPORT_TAB = {
+        "pt": "Importacao Inteligente",
+        "en": "Smart Import"
+    }
+    QUICK_IMPORT_TAB = {
+        "pt": "Importacao Rapida",
+        "en": "Quick Import"
+    }
+    
+    # ==============================================
     # PROGRESS TRACKING INTERFACE
     # ==============================================
     

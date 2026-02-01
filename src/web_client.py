@@ -785,12 +785,7 @@ class WebClient:
         # Only block the actual receipt submission (emitirRecibo)
         logger.info("Getting contracts list - Real API call in testing mode")
         
-        # Call the real method instead of returning mock data
-        return self.get_contracts_with_tenant_data()
-        
-        logger.info("Getting contracts list from Portal das Finanças")
-        
-        # Use the enhanced method that handles 401 authentication and has fallback mechanisms
+        # Call the real method which returns 3 values: (success, data, message)
         success, contracts_data, message = self.get_contracts_with_tenant_data()
         
         if not success:
@@ -2164,6 +2159,141 @@ class WebClient:
         except Exception as e:
             logger.error(f" Error getting rent value for contract {contract_id}: {str(e)}")
             return False, 0.0
+
+    def verify_receipt_in_portal(self, contract_id: str, receipt_number: str) -> Tuple[bool, Optional[Dict]]:
+        """
+        Verify that a receipt exists in the Portal das Finanças.
+        
+        Args:
+            contract_id: The contract ID
+            receipt_number: The receipt number to verify
+            
+        Returns:
+            Tuple of (success, receipt_details_dict or None)
+            - success=True, dict: Receipt found and details extracted
+            - success=True, None: Receipt not found (404 or similar)
+            - success=False, dict: Error occurred (dict contains error info)
+        """
+        if not self.authenticated:
+            logger.error("Cannot verify receipt: Not authenticated")
+            return False, {'error': 'Not authenticated'}
+        
+        logger.info(f"Verifying receipt in portal: Contract {contract_id}, Receipt #{receipt_number}")
+        
+        try:
+            # Construct the receipt details URL
+            # Based on README: /arrendamento/detalheRecibo/<contractId>/<numReceipt>
+            receipt_url = f"{self.receipts_base_url}/arrendamento/detalheRecibo/{contract_id}/{receipt_number}"
+            
+            logger.info(f"  Requesting: {receipt_url}")
+            
+            # Set appropriate headers
+            headers = {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'pt-PT,pt;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': f'{self.receipts_base_url}/arrendamento/consultarElementosContratos/locador',
+                'Connection': 'keep-alive'
+            }
+            
+            # Make the request
+            response = self.session.get(receipt_url, headers=headers, timeout=30)
+            
+            logger.info(f"  Response status: {response.status_code}")
+            
+            # Handle different response codes
+            if response.status_code == 200:
+                # Receipt found - try to parse details
+                logger.info("   Receipt found (200 OK)")
+                
+                try:
+                    # Parse the HTML response to extract receipt details
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    receipt_details = {
+                        'exists': True,
+                        'contract_id': contract_id,
+                        'receipt_number': receipt_number,
+                        'url': receipt_url
+                    }
+                    
+                    # Try to extract additional details from the page
+                    # Look for common patterns in the receipt details page
+                    
+                    # Try to find tenant name
+                    tenant_elements = soup.find_all(text=re.compile(r'Locatário|Inquilino', re.IGNORECASE))
+                    if tenant_elements:
+                        for elem in tenant_elements:
+                            parent = elem.find_parent()
+                            if parent:
+                                next_sibling = parent.find_next_sibling()
+                                if next_sibling:
+                                    receipt_details['tenant_name'] = next_sibling.get_text(strip=True)
+                                    break
+                    
+                    # Try to find issue date
+                    date_elements = soup.find_all(text=re.compile(r'Data de Emissão|Data', re.IGNORECASE))
+                    if date_elements:
+                        for elem in date_elements:
+                            parent = elem.find_parent()
+                            if parent:
+                                next_sibling = parent.find_next_sibling()
+                                if next_sibling:
+                                    date_text = next_sibling.get_text(strip=True)
+                                    if re.match(r'\d{2}[-/]\d{2}[-/]\d{4}', date_text):
+                                        receipt_details['issue_date'] = date_text
+                                        break
+                    
+                    logger.info(f"   Receipt details extracted: {list(receipt_details.keys())}")
+                    return True, receipt_details
+                    
+                except Exception as parse_error:
+                    logger.warning(f"   Could not parse receipt details: {parse_error}")
+                    # Still return success since the receipt exists
+                    return True, {
+                        'exists': True,
+                        'contract_id': contract_id,
+                        'receipt_number': receipt_number,
+                        'url': receipt_url
+                    }
+            
+            elif response.status_code == 404:
+                # Receipt not found
+                logger.warning(f"   Receipt not found (404)")
+                return True, None
+            
+            elif response.status_code == 302 or response.status_code == 301:
+                # Redirect - might indicate receipt not found or auth issue
+                logger.warning(f"   Redirect response ({response.status_code})")
+                location = response.headers.get('Location', 'unknown')
+                logger.info(f"   Redirect location: {location}")
+                
+                if 'login' in location.lower() or 'auth' in location.lower():
+                    return False, {'error': 'Authentication required', 'redirect': location}
+                else:
+                    # Assume receipt not found
+                    return True, None
+            
+            else:
+                # Other error status codes
+                logger.error(f"   Unexpected status code: {response.status_code}")
+                return False, {
+                    'error': f'HTTP {response.status_code}',
+                    'status_code': response.status_code,
+                    'response_preview': response.text[:200]
+                }
+                
+        except requests.exceptions.Timeout:
+            logger.error("   Request timeout")
+            return False, {'error': 'Request timeout'}
+            
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"   Connection error: {str(e)}")
+            return False, {'error': f'Connection error: {str(e)}'}
+            
+        except Exception as e:
+            logger.error(f"   Exception during verification: {str(e)}")
+            return False, {'error': f'Exception: {str(e)}'}
 
     def generate_prefilled_csv(self, save_directory: str = None) -> Tuple[bool, str]:
         """

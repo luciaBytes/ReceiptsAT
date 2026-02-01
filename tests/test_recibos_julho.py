@@ -6,11 +6,10 @@ Test the corrected payment date validation with recibos_julho.csv
 import sys
 import os
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.csv_handler import CSVHandler
+from csv_handler import CSVHandler
 
 def test_recibos_julho():
     """Test loading recibos_julho.csv with the corrected validation."""
@@ -18,6 +17,7 @@ def test_recibos_julho():
     print("TESTING RECIBOS_JULHO.CSV WITH CORRECTED PAYMENT DATE VALIDATION")
     print("=" * 80)
     
+    project_root = os.path.join(os.path.dirname(__file__), '..')
     csv_file_path = os.path.join(project_root, 'sample', 'recibos_julho.csv')
     
     if not os.path.exists(csv_file_path):
