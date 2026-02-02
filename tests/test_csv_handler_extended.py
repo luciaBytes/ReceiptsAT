@@ -345,3 +345,81 @@ class TestDialectDetection:
             assert isinstance(errors, list)
         finally:
             os.unlink(temp_path)
+
+
+class TestExportReport:
+    """Test report export functionality."""
+    
+    def test_export_report_creates_file(self):
+        """Test that export_report creates a file."""
+        handler = CSVHandler()
+        
+        # Create temporary receipts data as dictionaries
+        receipts = [
+            {
+                'contract_id': '123',
+                'from_date': '2025-01-01',
+                'to_date': '2025-01-31',
+                'receipt_type': 'rent',
+                'value': '500.00',
+                'payment_date': '2025-01-05'
+            }
+        ]
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            output_path = f.name
+        
+        try:
+            result = handler.export_report(receipts, output_path)
+            assert result is True
+            assert os.path.exists(output_path)
+            
+            # Verify content
+            with open(output_path, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+                assert '123' in content
+                assert '2025-01-01' in content
+        finally:
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+    
+    def test_export_report_empty_receipts(self):
+        """Test export with empty receipts list."""
+        handler = CSVHandler()
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            output_path = f.name
+        
+        try:
+            result = handler.export_report([], output_path)
+            # Empty receipts should return False
+            assert result is False
+        finally:
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+
+
+class TestNormalizeDate:
+    """Test _normalize_date helper method."""
+    
+    def test_normalize_date_valid_formats(self):
+        """Test various valid date formats."""
+        handler = CSVHandler()
+        
+        # Test YYYY-MM-DD
+        assert handler._normalize_date("2025-01-15") == "2025-01-15"
+        
+        # Test DD/MM/YYYY
+        assert handler._normalize_date("15/01/2025") == "2025-01-15"
+        
+        # Test DD-MM-YYYY
+        assert handler._normalize_date("15-01-2025") == "2025-01-15"
+    
+    def test_normalize_date_invalid(self):
+        """Test invalid date handling."""
+        handler = CSVHandler()
+        
+        # Invalid format should return original or None
+        result = handler._normalize_date("invalid-date")
+        assert result is None or result == "invalid-date"
+

@@ -10,17 +10,10 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-try:
-    from web_client import WebClient
-    from receipt_processor import ProcessingResult
-    from receipt_verifier import ReceiptVerifier
-    from utils.logger import get_logger
-except ImportError:
-    # Fallback for different import paths
-    from src.web_client import WebClient
-    from src.receipt_processor import ProcessingResult
-    from src.receipt_verifier import ReceiptVerifier
-    from src.utils.logger import get_logger
+from web_client import WebClient
+from receipt_processor import ProcessingResult
+from receipt_verifier import ReceiptVerifier
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

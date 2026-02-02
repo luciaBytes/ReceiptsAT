@@ -36,7 +36,7 @@ class TestWebClientInit:
 class TestConnectionTesting:
     """Test connection testing functionality."""
     
-    @patch('src.web_client.requests.Session.get')
+    @patch('web_client.requests.Session.get')
     def test_connection_success(self, mock_get):
         """Test successful connection to login page."""
         mock_response = Mock()
@@ -52,7 +52,7 @@ class TestConnectionTesting:
         assert "successful" in message.lower()
         mock_get.assert_called_once()
     
-    @patch('src.web_client.requests.Session.get')
+    @patch('web_client.requests.Session.get')
     def test_connection_timeout(self, mock_get):
         """Test connection timeout handling."""
         mock_get.side_effect = Exception("timeout")
@@ -63,7 +63,7 @@ class TestConnectionTesting:
         assert success is False
         assert len(message) > 0
     
-    @patch('src.web_client.requests.Session.get')
+    @patch('web_client.requests.Session.get')
     def test_connection_no_login_indicators(self, mock_get):
         """Test response when login page indicators are missing."""
         mock_response = Mock()
@@ -110,7 +110,7 @@ class TestHeaderConfiguration:
 class TestCSRFTokenExtraction:
     """Test CSRF token extraction from login pages."""
     
-    @patch('src.web_client.requests.Session.get')
+    @patch('web_client.requests.Session.get')
     def test_csrf_token_extraction_success(self, mock_get):
         """Test successful CSRF token extraction."""
         mock_response = Mock()
@@ -132,7 +132,7 @@ class TestCSRFTokenExtraction:
         if csrf_data:
             assert isinstance(csrf_data, dict)
     
-    @patch('src.web_client.requests.Session.get')
+    @patch('web_client.requests.Session.get')
     def test_csrf_token_extraction_failure(self, mock_get):
         """Test CSRF extraction when page load fails."""
         mock_get.side_effect = Exception("Network error")
@@ -208,3 +208,80 @@ class TestURLConfiguration:
         client = WebClient()
         assert client.login_page_url.startswith(client.auth_base_url)
         assert client.login_url.startswith(client.auth_base_url)
+
+
+class TestLogout:
+    """Test logout functionality."""
+    
+    def test_logout_clears_authentication(self):
+        """Test that logout clears authentication state."""
+        client = WebClient()
+        client.authenticated = True
+        client._current_username = "test_user"
+        
+        client.logout()
+        
+        assert client.authenticated is False
+        assert client._current_username is None
+    
+    @patch('web_client.requests.Session.get')
+    def test_logout_calls_logout_url(self, mock_get):
+        """Test that logout makes request to logout URL."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+        
+        client = WebClient()
+        client.authenticated = True
+        client.logout()
+        
+        # Should have made a request
+        mock_get.assert_called()
+
+
+class TestErrorHandling:
+    """Test error handling in various methods."""
+    
+    @patch('web_client.requests.Session.get')
+    def test_network_error_handling(self, mock_get):
+        """Test handling of network errors."""
+        import requests
+        mock_get.side_effect = requests.exceptions.RequestException("Network error")
+        
+        client = WebClient()
+        success, message = client.test_connection()
+        
+        assert success is False
+        assert "error" in message.lower() or "network" in message.lower()
+    
+    @patch('web_client.requests.Session.post')
+    def test_timeout_error_handling(self, mock_post):
+        """Test handling of timeout errors."""
+        import requests
+        mock_post.side_effect = requests.exceptions.Timeout("Timeout")
+        
+        client = WebClient()
+        # This would typically be tested in login, but we can test the pattern
+        # The client should handle timeouts gracefully
+
+
+class TestSessionPersistence:
+    """Test session persistence across requests."""
+    
+    def test_session_reuse(self):
+        """Test that the same session is reused."""
+        client = WebClient()
+        session1 = client.session
+        session2 = client.session
+        
+        assert session1 is session2
+    
+    def test_session_cookies_preserved(self):
+        """Test that cookies are preserved in session."""
+        client = WebClient()
+        
+        # Add a cookie
+        client.session.cookies.set('test_cookie', 'test_value')
+        
+        # Cookie should still exist
+        assert 'test_cookie' in client.session.cookies

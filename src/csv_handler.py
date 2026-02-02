@@ -529,7 +529,7 @@ class CSVHandler:
             if not report_data:
                 return False
             
-            with open(file_path, 'w', newline='', encoding='utf-8') as file:
+            with open(file_path, 'w', newline='', encoding='utf-8-sig') as file:
                 writer = csv.DictWriter(file, fieldnames=report_data[0].keys())
                 writer.writeheader()
                 writer.writerows(report_data)
@@ -539,4 +539,267 @@ class CSVHandler:
             
         except Exception as e:
             logger.error(f"Error exporting report: {str(e)}")
+            return False
+    
+    def export_session_report(self, report_data: List[Dict], file_path: str, append: bool = True) -> bool:
+        """
+        Export session report data to CSV with option to append to existing file.
+        
+        This method is designed for session-based exports where multiple processing runs
+        should accumulate in the same file. The header is only written for new files.
+        
+        Args:
+            report_data: List of dictionaries containing report data
+            file_path: Path to save the report
+            append: If True and file exists, append data without header; 
+                   If False, overwrite file with header
+            
+        Returns:
+            Success status
+        """
+        try:
+            if not report_data:
+                logger.warning("No report data to export")
+                return False
+            
+            # Check if file exists
+            file_exists = os.path.exists(file_path)
+            
+            # Determine mode: append or write
+            if append and file_exists:
+                # Append mode: add data without header
+                mode = 'a'
+                write_header = False
+                logger.info(f"Appending {len(report_data)} rows to existing file: {file_path}")
+            else:
+                # Write mode: create new file with header
+                mode = 'w'
+                write_header = True
+                logger.info(f"Creating new export file with {len(report_data)} rows: {file_path}")
+            
+            with open(file_path, mode, newline='', encoding='utf-8-sig') as file:
+                writer = csv.DictWriter(file, fieldnames=report_data[0].keys())
+                
+                # Write header only for new files
+                if write_header:
+                    writer.writeheader()
+                
+                # Write all data rows
+                writer.writerows(report_data)
+            
+            logger.info(f"Session report exported successfully to {file_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error exporting session report: {str(e)}")
+            return False
+    
+    def export_session_report_excel(self, report_data: List[Dict], file_path: str, append: bool = True) -> bool:
+        """
+        Export session report data to Excel with option to append to existing file.
+        
+        Args:
+            report_data: List of dictionaries containing report data
+            file_path: Path to save the report (.xlsx)
+            append: If True and file exists, append data to existing sheet;
+                   If False, overwrite file
+            
+        Returns:
+            Success status
+        """
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+            
+            if not report_data:
+                logger.warning("No report data to export")
+                return False
+            
+            # Check if file exists
+            file_exists = os.path.exists(file_path)
+            
+            if append and file_exists:
+                # Load existing workbook and append data
+                logger.info(f"Appending {len(report_data)} rows to existing Excel file: {file_path}")
+                workbook = openpyxl.load_workbook(file_path)
+                sheet = workbook.active
+                
+                # Find the next empty row
+                next_row = sheet.max_row + 1
+                
+                # Append data rows
+                for data_row in report_data:
+                    for col_idx, key in enumerate(data_row.keys(), start=1):
+                        cell = sheet.cell(row=next_row, column=col_idx)
+                        cell.value = data_row[key]
+                    next_row += 1
+            else:
+                # Create new workbook
+                logger.info(f"Creating new Excel file with {len(report_data)} rows: {file_path}")
+                workbook = openpyxl.Workbook()
+                sheet = workbook.active
+                sheet.title = "Session Report"
+                
+                # Write header
+                headers = list(report_data[0].keys())
+                for col_idx, header in enumerate(headers, start=1):
+                    cell = sheet.cell(row=1, column=col_idx)
+                    cell.value = header
+                    cell.font = Font(bold=True, color="FFFFFF")
+                    cell.fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+                # Write data rows
+                for row_idx, data_row in enumerate(report_data, start=2):
+                    for col_idx, key in enumerate(headers, start=1):
+                        cell = sheet.cell(row=row_idx, column=col_idx)
+                        cell.value = data_row[key]
+                
+                # Auto-size columns
+                for col_idx in range(1, len(headers) + 1):
+                    column_letter = get_column_letter(col_idx)
+                    max_length = len(str(headers[col_idx - 1]))
+                    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=col_idx, max_col=col_idx):
+                        for cell in row:
+                            if cell.value:
+                                max_length = max(max_length, len(str(cell.value)))
+                    adjusted_width = min(max_length + 2, 50)
+                    sheet.column_dimensions[column_letter].width = adjusted_width
+            
+            # Save workbook
+            workbook.save(file_path)
+            logger.info(f"Session report exported successfully to {file_path}")
+            return True
+            
+        except ImportError:
+            logger.error("openpyxl library not installed. Cannot export to Excel.")
+            return False
+        except Exception as e:
+            logger.error(f"Error exporting session report to Excel: {str(e)}")
+            return False
+    
+    def export_errors_report(self, results: List, file_path: str) -> bool:
+        """
+        Export failed receipts with detailed error information.
+        
+        Args:
+            results: List of ProcessingResult objects
+            file_path: Path to save the error report
+            
+        Returns:
+            Success status
+        """
+        try:
+            # Filter for failed receipts only
+            failed_results = [r for r in results if not r.success and r.status == "Failed"]
+            
+            if not failed_results:
+                logger.warning("No failed receipts to export")
+                return False
+            
+            # Prepare error report data
+            error_data = []
+            for result in failed_results:
+                error_row = {
+                    'Contract Number': result.contract_id,
+                    'Tenant Name': result.tenant_name or 'Unknown',
+                    'Value': f"€{result.value:.2f}" if result.value else '',
+                    'Period From': result.from_date,
+                    'Period To': result.to_date,
+                    'Payment Date': result.payment_date,
+                    'Error Message': result.error_message,
+                    'Field Errors': result.field_errors,
+                    'Timestamp': result.timestamp
+                }
+                error_data.append(error_row)
+            
+            # Write to CSV
+            with open(file_path, 'w', newline='', encoding='utf-8-sig') as file:
+                fieldnames = ['Contract Number', 'Tenant Name', 'Value', 'Period From', 'Period To', 
+                             'Payment Date', 'Error Message', 'Field Errors', 'Timestamp']
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(error_data)
+            
+            logger.info(f"Error report exported to {file_path} with {len(error_data)} failed receipts")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error exporting errors report: {str(e)}")
+            return False
+    
+    def export_errors_report_excel(self, results: List, file_path: str) -> bool:
+        """
+        Export failed receipts with detailed error information to Excel.
+        
+        Args:
+            results: List of ProcessingResult objects
+            file_path: Path to save the error report (.xlsx)
+            
+        Returns:
+            Success status
+        """
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+            from openpyxl.utils import get_column_letter
+            
+            # Filter for failed receipts only
+            failed_results = [r for r in results if not r.success and r.status == "Failed"]
+            
+            if not failed_results:
+                logger.warning("No failed receipts to export")
+                return False
+            
+            # Create workbook
+            workbook = openpyxl.Workbook()
+            sheet = workbook.active
+            sheet.title = "Error Report"
+            
+            # Define headers
+            headers = ['Contract Number', 'Tenant Name', 'Value', 'Period From', 'Period To', 
+                      'Payment Date', 'Error Message', 'Field Errors', 'Timestamp']
+            
+            # Write header row
+            for col_idx, header in enumerate(headers, start=1):
+                cell = sheet.cell(row=1, column=col_idx)
+                cell.value = header
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill(start_color="DC2626", end_color="DC2626", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            
+            # Write data rows
+            for row_idx, result in enumerate(failed_results, start=2):
+                sheet.cell(row=row_idx, column=1).value = result.contract_id
+                sheet.cell(row=row_idx, column=2).value = result.tenant_name or 'Unknown'
+                sheet.cell(row=row_idx, column=3).value = f"€{result.value:.2f}" if result.value else ''
+                sheet.cell(row=row_idx, column=4).value = result.from_date
+                sheet.cell(row=row_idx, column=5).value = result.to_date
+                sheet.cell(row=row_idx, column=6).value = result.payment_date
+                sheet.cell(row=row_idx, column=7).value = result.error_message
+                sheet.cell(row=row_idx, column=8).value = result.field_errors
+                sheet.cell(row=row_idx, column=9).value = result.timestamp
+            
+            # Auto-size columns
+            for col_idx in range(1, len(headers) + 1):
+                column_letter = get_column_letter(col_idx)
+                max_length = len(str(headers[col_idx - 1]))
+                for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=col_idx, max_col=col_idx):
+                    for cell in row:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                adjusted_width = min(max_length + 2, 60)
+                sheet.column_dimensions[column_letter].width = adjusted_width
+            
+            # Save workbook
+            workbook.save(file_path)
+            logger.info(f"Error report exported to {file_path} with {len(failed_results)} failed receipts")
+            return True
+            
+        except ImportError:
+            logger.error("openpyxl library not installed. Cannot export to Excel.")
+            return False
+        except Exception as e:
+            logger.error(f"Error exporting errors report to Excel: {str(e)}")
             return False

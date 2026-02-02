@@ -20,6 +20,7 @@ from utils.version import format_version_string, get_version
 from utils.multilingual_localization import get_text, switch_language, get_language_button_text
 from gui.api_monitor_dialog import show_api_monitor_dialog
 from gui.smart_import_tab import SmartImportTab
+from gui.api_monitor_tab import APIMonitorTab
 from gui.theme import ReceiptsTheme
 from gui.themed_button import ThemedButton
 
@@ -62,7 +63,7 @@ class MainWindow:
         
         # Variables
         self.csv_file_path = tk.StringVar()
-        self.mode_var = tk.StringVar(value="bulk")
+        self.mode_var = tk.StringVar(value="step")
         self.dry_run_var = tk.BooleanVar(value=False)
         self.progress_var = tk.DoubleVar()
         self.status_var = tk.StringVar(value=get_text('STATUS_READY'))
@@ -153,17 +154,31 @@ class MainWindow:
         username_frame.pack(fill=tk.X, pady=(0, 6))
         
         tk.Label(username_frame, text=get_text('USERNAME_LABEL'),
-                bg='#1e293b', fg='#ffffff',
+                bg='#1e293b', fg='#ffffff', width=10, anchor='w',
                 font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
-        self.username_entry = ttk.Entry(username_frame, width=18, foreground='black')
+        
+        # Create username entry frame to match password frame structure
+        username_entry_frame = tk.Frame(username_frame, bg='#1e293b')
+        username_entry_frame.pack(side=tk.LEFT)
+        
+        self.username_entry = ttk.Entry(username_entry_frame, width=18, foreground='black')
         self.username_entry.pack(side=tk.LEFT)
+        
+        # Add spacer to align with password visibility button width
+        tk.Frame(username_entry_frame, width=29, bg='#1e293b').pack(side=tk.LEFT)
+        
+        # Login button next to username (will align with logout button)
+        self.login_button = ThemedButton(username_frame, style='primary',
+                                        text=get_text('LOGIN_BUTTON'), 
+                                        command=self._login)
+        self.login_button.pack(side=tk.LEFT, padx=(10, 0))
         
         # Password
         password_outer_frame = tk.Frame(credentials_frame, bg='#1e293b')
         password_outer_frame.pack(fill=tk.X)
         
         tk.Label(password_outer_frame, text=get_text('PASSWORD_LABEL'),
-                bg='#1e293b', fg='#ffffff',
+                bg='#1e293b', fg='#ffffff', width=10, anchor='w',
                 font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
         
         # Create password frame to hold entry and toggle button
@@ -178,6 +193,12 @@ class MainWindow:
         self.toggle_password_btn = ttk.Button(password_frame, text="👁", width=2, 
                                             command=self._toggle_password_visibility)
         self.toggle_password_btn.pack(side=tk.LEFT, padx=(1, 0))
+        
+        # Logout button next to password (aligned with login button above)
+        self.logout_button = ThemedButton(password_outer_frame, style='secondary',
+                                         text=get_text('LOGOUT_BUTTON'), 
+                                         command=self._logout, state="disabled")
+        self.logout_button.pack(side=tk.LEFT, padx=(10, 0))
         
         # Add tooltips to the entry fields
         self._create_tooltip(self.username_entry, 
@@ -195,20 +216,6 @@ class MainWindow:
         
         # Bind keyboard shortcut for password toggle
         self.root.bind('<Control-Shift-P>', lambda e: self._toggle_password_visibility())
-        
-        # Right: Login/Logout buttons 
-        buttons_frame = tk.Frame(login_content, bg='#1e293b')
-        buttons_frame.pack(side=tk.RIGHT, padx=(10, 0))
-        
-        self.login_button = ThemedButton(buttons_frame, style='primary',
-                                        text=get_text('LOGIN_BUTTON'), 
-                                        command=self._login)
-        self.login_button.pack(pady=(0, 4))
-        
-        self.logout_button = ThemedButton(buttons_frame, style='secondary',
-                                         text=get_text('LOGOUT_BUTTON'), 
-                                         command=self._logout, state="disabled")
-        self.logout_button.pack()
         
         # Status labels frame
         status_frame = tk.Frame(login_frame, bg='#1e293b')
@@ -272,9 +279,9 @@ class MainWindow:
         )
         self.notebook.add(self.smart_import_tab, text=get_text('SMART_IMPORT_TAB'))
         
-        # Quick Import tab (simplified CSV-only workflow)
-        self.quick_import_tab = self._create_quick_import_tab()
-        self.notebook.add(self.quick_import_tab, text=get_text('QUICK_IMPORT_TAB'))
+        # API Monitor tab
+        self.api_monitor_tab = APIMonitorTab(self.notebook)
+        self.notebook.add(self.api_monitor_tab, text=get_text('API_MONITOR_TAB'))
         
         # Version info at bottom
         version_frame = tk.Frame(inner_frame, bg='#1e293b')
@@ -290,146 +297,12 @@ class MainWindow:
         
         # Don't test connection on startup - wait for user to click login
     
-    def _create_quick_import_tab(self):
-        """Create the Quick Import tab with existing workflow."""
-        # Create outer frame for tab
-        tab_outer = tk.Frame(self.notebook, bg='#1e293b')
-        
-        # Create canvas and scrollbar for scrolling
-        canvas = tk.Canvas(tab_outer, bg='#1e293b', highlightthickness=0)
-        scrollbar = ttk.Scrollbar(tab_outer, orient="vertical", command=canvas.yview)
-        quick_frame = tk.Frame(canvas, bg='#1e293b')
-        
-        # Configure canvas scrolling
-        quick_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=quick_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Pack canvas and scrollbar
-        canvas.pack(side="left", fill="both", expand=True, padx=12, pady=12)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Bind mousewheel for scrolling
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        
-        # CSV file section with icon
-        csv_frame = tk.LabelFrame(quick_frame, text="  📄 " + get_text('CSV_FILE_SECTION') + "  ",
-                                 bg='#1e293b', fg='#3b82f6',
-                                 font=('Segoe UI', 9), relief='solid', borderwidth=1,
-                                 padx=12, pady=8)
-        csv_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # File selection row
-        file_row = tk.Frame(csv_frame, bg='#1e293b')
-        file_row.pack(fill=tk.X)
-        
-        tk.Label(file_row, text=get_text('FILE_LABEL'),
-                bg='#1e293b', fg='#ffffff',
-                font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 8))
-        
-        file_entry = ttk.Entry(file_row, textvariable=self.csv_file_path, state="readonly", foreground='black')
-        file_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
-        
-        ThemedButton(file_row, style='secondary', text="📁 " + get_text('BROWSE_BUTTON'), 
-                    command=self._browse_csv_file).pack(side=tk.LEFT, padx=(0, 6))
-        
-        # Pre-filled CSV Generator button
-        ThemedButton(file_row, style='secondary', text="📝 Get Pre-filled List", 
-                    command=self._generate_prefilled_csv).pack(side=tk.LEFT)
-        
-        # Processing Results section
-        results_frame = tk.LabelFrame(quick_frame, text="  ✓ Processing Results  ",
-                                     bg='#1e293b', fg='#3b82f6',
-                                     font=('Segoe UI', 9), relief='solid', borderwidth=1,
-                                     padx=12, pady=8)
-        results_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.quick_results_label = tk.Label(results_frame, text="No receipts processed yet",
-                                           bg='#1e293b', fg='#94a3b8',
-                                           font=('Segoe UI', 9))
-        self.quick_results_label.pack(anchor=tk.W)
-        
-        # Control buttons
-        button_frame = tk.Frame(quick_frame, bg='#1e293b')
-        button_frame.pack(pady=(0, 10))
-        
-        # Validate button (Tertiary style)
-        self.validate_button = ThemedButton(button_frame, style='tertiary',
-                                           text="✓ " + get_text('VALIDATE_CONTRACTS_BUTTON'), 
-                                           command=self._validate_contracts, state="disabled")
-        self.validate_button.pack(side=tk.LEFT, padx=(0, 6))
-        
-        # Process receipts button (Primary style - main action)
-        self.start_button = ThemedButton(button_frame, style='primary',
-                                        text="▶ " + get_text('PROCESS_RECEIPTS_BUTTON'), 
-                                        command=self._start_processing, state="disabled")
-        self.start_button.pack(side=tk.LEFT, padx=(0, 6))
-        
-        # Stop button (Danger style)
-        self.stop_button = ThemedButton(button_frame, style='danger',
-                                       text="⏹ " + get_text('CANCEL_BUTTON'), 
-                                       command=self._stop_processing, state="disabled")
-        self.stop_button.pack(side=tk.LEFT, padx=(0, 6))
-        
-        # Export results button (Secondary style)
-        self.export_results_button = ThemedButton(button_frame, style='secondary',
-                                                  text="📊 " + get_text('EXPORT_RESULTS_BUTTON'), 
-                                                  command=self._export_report)
-        self.export_results_button.pack(side=tk.LEFT, padx=(0, 6))
-        
-        # Verify & Export button (Success style - green)
-        self.verify_export_button = ThemedButton(button_frame, style='success',
-                                                 text="✅ Verify & Export", 
-                                                 command=self._verify_and_export_receipts)
-        self.verify_export_button.pack(side=tk.LEFT, padx=(0, 6))
-        
-        ThemedButton(button_frame, style='secondary', text="📡 API Monitor", 
-                    command=self._show_api_monitor).pack(side=tk.LEFT)
-        
-        # Progress section with icon
-        progress_frame = tk.LabelFrame(quick_frame, text="  ⏱ " + get_text('STATUS_SECTION') + "  ",
-                                      bg='#1e293b', fg='#3b82f6',
-                                      font=('Segoe UI', 9), relief='solid', borderwidth=1,
-                                      padx=12, pady=8)
-        progress_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        self.progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var, 
-                                           maximum=100, mode='determinate')
-        self.progress_bar.pack(fill=tk.X, pady=(0, 6))
-        
-        status_label = tk.Label(progress_frame, textvariable=self.status_var,
-                               bg='#1e293b', fg='#ffffff',
-                               font=('Segoe UI', 9), anchor=tk.W)
-        status_label.pack(fill=tk.X)
-        
-        # Log section with icon
-        log_frame = tk.LabelFrame(quick_frame, text="  📋 " + get_text('LOG_SECTION') + "  ",
-                                 bg='#1e293b', fg='#3b82f6',
-                                 font=('Segoe UI', 9), relief='solid', borderwidth=1,
-                                 padx=12, pady=8)
-        log_frame.pack(fill=tk.BOTH, expand=True)
-        
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80, wrap=tk.WORD,
-                                                  font=('Consolas', 9),
-                                                  bg='#0f172a',
-                                                  fg='#94a3b8',
-                                                  relief='sunken',
-                                                  borderwidth=2,
-                                                  highlightthickness=0,
-                                                  padx=10,
-                                                  pady=10)
-        self.log_text.pack(fill=tk.BOTH, expand=True)
-        
-        return tab_outer
-    
     def _setup_log_handler(self):
-        """Set up a custom log handler to capture all logs and display in GUI."""
+        """Set up a custom log handler to capture all logs."""
+        # Create a hidden log widget to capture logs (Smart Import tab has its own visible logs)
+        self.log_text = scrolledtext.ScrolledText(self.root, height=1, width=1)
+        # Don't pack it - it's only for capturing logs
+        
         class GUILogHandler(logging.Handler):
             def __init__(self, text_widget, root):
                 super().__init__()
@@ -1171,6 +1044,89 @@ class MainWindow:
                 self.log("ERROR", "Failed to export report")
                 messagebox.showerror(get_text('EXPORT_FAILED_TITLE'), get_text('EXPORT_REPORT_FAILED_MESSAGE'))
     
+    def _export_session_report(self):
+        """
+        Export session report with 2-row format per receipt.
+        
+        This export accumulates receipts within the same session by appending
+        to the existing file if one is selected.
+        """
+        results = self.processor.get_results()
+        if not results:
+            messagebox.showinfo("No Results", "No receipts have been issued yet.\nPlease process receipts before exporting.")
+            return
+        
+        # Check if we have any successful receipts to export
+        successful_results = [r for r in results if r.success]
+        if not successful_results:
+            messagebox.showinfo("No Successful Receipts", "No receipts were successfully issued.\nOnly successful receipts are included in the session report.")
+            return
+        
+        # Ask user for file location with default filename
+        default_filename = f"session_report_{datetime.now().strftime('%Y%m%d')}.csv"
+        file_path = filedialog.asksaveasfilename(
+            title="Save Session Report",
+            defaultextension=".csv",
+            initialfile=default_filename,
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+        )
+        
+        if not file_path:
+            return  # User cancelled
+        
+        # Check if file already exists
+        file_exists = os.path.exists(file_path)
+        append_mode = False
+        
+        if file_exists:
+            # Ask user if they want to append or overwrite
+            response = messagebox.askyesnocancel(
+                "File Exists",
+                f"The file already exists:\n{file_path}\n\n"
+                "Yes: Append new receipts to existing file (session mode)\n"
+                "No: Overwrite file with new data\n"
+                "Cancel: Cancel export"
+            )
+            
+            if response is None:  # Cancel
+                return
+            elif response:  # Yes - append
+                append_mode = True
+                self.log("INFO", "Appending to existing session report...")
+            else:  # No - overwrite
+                append_mode = False
+                self.log("INFO", "Creating new session report...")
+        else:
+            self.log("INFO", "Creating new session report...")
+        
+        # Generate session export data
+        report_data = self.processor.generate_session_export_data()
+        
+        if not report_data:
+            messagebox.showwarning("No Data", "No data to export")
+            return
+        
+        # Export using session report method
+        success = self.csv_handler.export_session_report(report_data, file_path, append=append_mode)
+        
+        if success:
+            receipt_count = len(successful_results)
+            row_count = len(report_data)
+            mode_text = "appended to" if append_mode else "saved to"
+            
+            self.log("INFO", f"Session report {mode_text}: {file_path}")
+            self.log("INFO", f"Exported {receipt_count} receipts ({row_count} rows)")
+            
+            messagebox.showinfo(
+                "Export Successful",
+                f"Session report {mode_text}:\n{file_path}\n\n"
+                f"Receipts exported: {receipt_count}\n"
+                f"Total rows: {row_count}"
+            )
+        else:
+            self.log("ERROR", "Failed to export session report")
+            messagebox.showerror("Export Failed", "Failed to export session report.\nCheck the logs for details.")
+    
     def _verify_and_export_receipts(self):
         """Verify receipts in portal and export detailed report."""
         results = self.processor.get_results()
@@ -1257,19 +1213,6 @@ class MainWindow:
         else:
             logger.debug(message)
     
-    def _on_smart_import_csv_generated(self, file_path: str, receipts):
-        """Handle CSV generation from Smart Import tab."""
-        logger.info(f"Smart Import generated CSV: {file_path} with {len(receipts)} receipts")
-        
-        # Load the CSV file into Quick Import tab for processing
-        self.csv_file_path.set(file_path)
-        self._validate_csv_file(file_path)
-        
-        # Switch to Quick Import tab
-        self.notebook.select(self.quick_import_tab)
-        
-        logger.info("Switched to Quick Import tab - CSV ready for processing")
-    
     def _show_step_confirmation_dialog(self, receipt_data, form_data):
         """Show confirmation dialog for step-by-step processing."""
         # Create a result variable to store the user's choice
@@ -1279,6 +1222,7 @@ class MainWindow:
         dialog = tk.Toplevel(self.root)
         dialog.title("Step-by-Step Processing")
         dialog.geometry("600x400")
+        dialog.configure(bg='#1e293b')  # Set dark background
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -1286,19 +1230,20 @@ class MainWindow:
         dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 100, self.root.winfo_rooty() + 100))
         
         # Main frame
-        main_frame = ttk.Frame(dialog, padding="10")
+        main_frame = tk.Frame(dialog, bg='#1e293b', padx=10, pady=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Receipt information
-        info_frame = ttk.LabelFrame(main_frame, text="Receipt Information", padding="10")
+        info_frame = tk.LabelFrame(main_frame, text="Receipt Information", bg='#1e293b', fg='#3b82f6', 
+                                   font=('Segoe UI', 9), relief='solid', borderwidth=1, padx=10, pady=10)
         info_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Create a frame for contract ID and tenant name
-        contract_frame = ttk.Frame(info_frame)
+        contract_frame = tk.Frame(info_frame, bg='#1e293b')
         contract_frame.pack(fill=tk.X, pady=2)
         
         # Contract ID with selectable text
-        ttk.Label(contract_frame, text="Contract ID:").pack(side=tk.LEFT)
+        tk.Label(contract_frame, text="Contract ID:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
         
         # Get tenant name from form_data if available
         tenant_name = form_data.get('tenant_name', '') if form_data else ''
@@ -1316,56 +1261,62 @@ class MainWindow:
         contract_var = tk.StringVar(value=contract_display)
         contract_entry = ttk.Entry(contract_frame, textvariable=contract_var, state='readonly', width=50)
         contract_entry.pack(side=tk.LEFT, padx=(5, 5))
+        # Configure text color for readonly entry
+        contract_entry.configure(foreground='black')
         
         # Period information (selectable)
-        period_frame = ttk.Frame(info_frame)
+        period_frame = tk.Frame(info_frame, bg='#1e293b')
         period_frame.pack(fill=tk.X, pady=2)
         
-        ttk.Label(period_frame, text="Period:").pack(side=tk.LEFT)
+        tk.Label(period_frame, text="Period:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
         period_text = f"{receipt_data.from_date} to {receipt_data.to_date}"
         period_var = tk.StringVar(value=period_text)
         period_entry = ttk.Entry(period_frame, textvariable=period_var, state='readonly', width=25)
         period_entry.pack(side=tk.LEFT, padx=(5, 5))
+        period_entry.configure(foreground='black')
         
         # Payment date
-        payment_frame = ttk.Frame(info_frame)
+        payment_frame = tk.Frame(info_frame, bg='#1e293b')
         payment_frame.pack(fill=tk.X, pady=2)
         
-        ttk.Label(payment_frame, text="Payment Date:").pack(side=tk.LEFT)
+        tk.Label(payment_frame, text="Payment Date:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
         payment_var = tk.StringVar(value=str(receipt_data.payment_date))
         payment_entry = ttk.Entry(payment_frame, textvariable=payment_var, state='readonly', width=12)
         payment_entry.pack(side=tk.LEFT, padx=(5, 5))
+        payment_entry.configure(foreground='black')
         
         # Payment date is now required - no defaulted indicator needed
         
         # Value
-        value_frame = ttk.Frame(info_frame)
+        value_frame = tk.Frame(info_frame, bg='#1e293b')
         value_frame.pack(fill=tk.X, pady=2)
         
-        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+        tk.Label(value_frame, text="Value:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
         value_text = f"€{receipt_data.value:.2f}"
         value_var = tk.StringVar(value=value_text)
         value_entry = ttk.Entry(value_frame, textvariable=value_var, state='readonly', width=12)
         value_entry.pack(side=tk.LEFT, padx=(5, 5))
+        value_entry.configure(foreground='black')
         
         # Show value status indicators
         if hasattr(receipt_data, 'value_defaulted') and receipt_data.value_defaulted:
-            ttk.Label(value_frame, text="(defaulted from contract)", foreground='orange').pack(side=tk.LEFT)
+            tk.Label(value_frame, text="(defaulted from contract)", bg='#1e293b', fg='orange', font=('Segoe UI', 8)).pack(side=tk.LEFT)
         elif receipt_data.value == 0.0:
-            ttk.Label(value_frame, text="(not specified in CSV)", foreground='red').pack(side=tk.LEFT)
+            tk.Label(value_frame, text="(not specified in CSV)", bg='#1e293b', fg='red', font=('Segoe UI', 8)).pack(side=tk.LEFT)
         
         # Receipt type
-        receipt_type_frame = ttk.Frame(info_frame)
+        receipt_type_frame = tk.Frame(info_frame, bg='#1e293b')
         receipt_type_frame.pack(fill=tk.X, pady=2)
         
-        ttk.Label(receipt_type_frame, text="Receipt Type:").pack(side=tk.LEFT)
+        tk.Label(receipt_type_frame, text="Receipt Type:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
         receipt_type_var = tk.StringVar(value=str(receipt_data.receipt_type))
         receipt_type_entry = ttk.Entry(receipt_type_frame, textvariable=receipt_type_var, state='readonly', width=12)
         receipt_type_entry.pack(side=tk.LEFT, padx=(5, 5))
+        receipt_type_entry.configure(foreground='black')
         
         # Show receipt type status indicator
         if hasattr(receipt_data, 'receipt_type_defaulted') and receipt_data.receipt_type_defaulted:
-            ttk.Label(receipt_type_frame, text="(defaulted)", foreground='orange').pack(side=tk.LEFT)
+            tk.Label(receipt_type_frame, text="(defaulted)", bg='#1e293b', fg='orange', font=('Segoe UI', 8)).pack(side=tk.LEFT)
         
         # Contract information (if available) - removed tenant display here as it's now shown with contract ID
         if form_data and not form_data.get('mock'):
@@ -1375,39 +1326,42 @@ class MainWindow:
             
             # Only show contract info frame if there's additional info beyond tenant name
             if landlords or property_address != 'Not available':
-                contract_info_frame = ttk.LabelFrame(main_frame, text="Contract Information", padding="10")
+                contract_info_frame = tk.LabelFrame(main_frame, text="Contract Information", bg='#1e293b', fg='#3b82f6',
+                                                   font=('Segoe UI', 9), relief='solid', borderwidth=1, padx=10, pady=10)
                 contract_info_frame.pack(fill=tk.X, pady=(0, 10))
             
             if landlords:
                 landlord_names = [l.get('nome', 'Unknown') for l in landlords]
                 landlord_text = ', '.join(landlord_names)
                 
-                landlord_frame = ttk.Frame(contract_info_frame)
+                landlord_frame = tk.Frame(contract_info_frame, bg='#1e293b')
                 landlord_frame.pack(fill=tk.X, pady=2)
                 
-                ttk.Label(landlord_frame, text="Landlords:").pack(side=tk.LEFT)
+                tk.Label(landlord_frame, text="Landlords:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
                 landlord_var = tk.StringVar(value=landlord_text)
                 landlord_entry = ttk.Entry(landlord_frame, textvariable=landlord_var, state='readonly', width=40)
                 landlord_entry.pack(side=tk.LEFT, padx=(5, 5))
             
             property_address = contract_details.get('property_address', 'Not available')
             if property_address != 'Not available':
-                property_frame = ttk.Frame(contract_info_frame)
+                property_frame = tk.Frame(contract_info_frame, bg='#1e293b')
                 property_frame.pack(fill=tk.X, pady=2)
                 
-                ttk.Label(property_frame, text="Property:").pack(side=tk.LEFT)
+                tk.Label(property_frame, text="Property:", bg='#1e293b', fg='#ffffff', font=('Segoe UI', 9)).pack(side=tk.LEFT)
                 property_var = tk.StringVar(value=property_address)
                 property_entry = ttk.Entry(property_frame, textvariable=property_var, state='readonly', width=40)
                 property_entry.pack(side=tk.LEFT, padx=(5, 5))
         
         # Question frame
-        question_frame = ttk.LabelFrame(main_frame, text=get_text('ACTION_SECTION'), padding="10")
+        question_frame = tk.LabelFrame(main_frame, text=get_text('ACTION_SECTION'), bg='#1e293b', fg='#3b82f6',
+                                      font=('Segoe UI', 9), relief='solid', borderwidth=1, padx=10, pady=10)
         question_frame.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Label(question_frame, text="Deseja processar este recibo?", font=("TkDefaultFont", 10, "bold")).pack(anchor=tk.W)
+        tk.Label(question_frame, text="Deseja processar este recibo?", bg='#1e293b', fg='#ffffff', 
+                font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
         
         # Buttons frame
-        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame = tk.Frame(main_frame, bg='#1e293b')
         buttons_frame.pack(fill=tk.X)
         
         def on_confirm():
@@ -1811,6 +1765,7 @@ class TwoFactorDialog:
         self.dialog = tk.Toplevel(self.parent)
         self.dialog.title(get_text('TWO_FACTOR_TITLE'))
         self.dialog.geometry("400x200")
+        self.dialog.configure(bg='#1e293b')  # Set dark background
         self.dialog.resizable(False, False)
         
         # Make dialog modal
@@ -1824,32 +1779,37 @@ class TwoFactorDialog:
         ))
         
         # Create main frame
-        main_frame = ttk.Frame(self.dialog, padding="20")
+        main_frame = tk.Frame(self.dialog, bg='#1e293b', padx=20, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Title and instructions
-        title_label = ttk.Label(main_frame, text="Verificacao SMS Necessaria", 
-                               font=("Arial", 12, "bold"))
+        title_label = tk.Label(main_frame, text="Verificacao SMS Necessaria", 
+                               bg='#1e293b', fg='#3b82f6',
+                               font=("Segoe UI", 12, "bold"))
         title_label.pack(pady=(0, 10))
         
         # Show error message if provided
         if self.error_message:
-            error_label = ttk.Label(main_frame, text=self.error_message,
-                                   font=("Arial", 10), foreground="red",
+            error_label = tk.Label(main_frame, text=self.error_message,
+                                   bg='#1e293b', fg='red',
+                                   font=("Segoe UI", 10),
                                    wraplength=350, justify=tk.CENTER)
             error_label.pack(pady=(0, 10))
         
-        info_label = ttk.Label(main_frame, 
+        info_label = tk.Label(main_frame, 
                               text=get_text('TWO_FACTOR_MESSAGE'),
+                              bg='#1e293b', fg='#ffffff',
+                              font=("Segoe UI", 9),
                               wraplength=350, justify=tk.CENTER)
         info_label.pack(pady=(0, 15))
         
         # SMS code entry
-        code_frame = ttk.Frame(main_frame)
+        code_frame = tk.Frame(main_frame, bg='#1e293b')
         code_frame.pack(pady=(0, 15))
         
-        ttk.Label(code_frame, text=get_text('SMS_CODE_LABEL')).pack(side=tk.LEFT, padx=(0, 10))
-        self.sms_entry = ttk.Entry(code_frame, width=15, font=("Arial", 12), foreground='black')
+        tk.Label(code_frame, text=get_text('SMS_CODE_LABEL'), bg='#1e293b', fg='#ffffff', 
+                font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 10))
+        self.sms_entry = ttk.Entry(code_frame, width=15, font=("Segoe UI", 12), foreground='black')
         self.sms_entry.pack(side=tk.LEFT)
         self.sms_entry.focus()
         
@@ -1857,7 +1817,7 @@ class TwoFactorDialog:
         self.sms_entry.bind('<Return>', lambda e: self._submit_code())
         
         # Buttons
-        button_frame = ttk.Frame(main_frame)
+        button_frame = tk.Frame(main_frame, bg='#1e293b')
         button_frame.pack(fill=tk.X)
         
         verify_button = ThemedButton(button_frame, style='primary', text=get_text('VERIFY_BUTTON'), command=self._submit_code)
@@ -1867,9 +1827,10 @@ class TwoFactorDialog:
         cancel_button.pack(side=tk.RIGHT)
         
         # Instructions
-        help_label = ttk.Label(main_frame, 
+        help_label = tk.Label(main_frame, 
                               text=get_text('TWO_FACTOR_HELP'),
-                              font=("Arial", 8), foreground="gray")
+                              bg='#1e293b', fg='#64748b',
+                              font=("Segoe UI", 8))
         help_label.pack(pady=(10, 0))
     
     def _submit_code(self):

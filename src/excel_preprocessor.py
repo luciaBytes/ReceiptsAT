@@ -57,6 +57,7 @@ class TenantData:
         name: Tenant name (informational)
         rent: Monthly rent amount
         rent_deposit: Months paid in advance (typically 1)
+        deposit_month_offset: Month offset from "Mês Caução" column (for from/to dates)
         months_late: Months behind on payment (0 if on time)
         paid_current_month: True if paying for current month instead of future
         row_number: Excel row number (for error reporting)
@@ -65,6 +66,7 @@ class TenantData:
     name: str
     rent: float
     rent_deposit: int
+    deposit_month_offset: int
     months_late: int
     paid_current_month: bool
     row_number: int
@@ -122,6 +124,8 @@ class ReceiptData:
         payment_date: Date payment was made
         receipt_type: Type of receipt (typically "rent")
         value: Payment amount
+        rent_deposit: Months paid in advance (from TenantData)
+        months_late: Months behind on payment (from TenantData)
     """
     contract_id: str
     from_date: date
@@ -129,6 +133,8 @@ class ReceiptData:
     payment_date: date
     receipt_type: str
     value: float
+    rent_deposit: int = 0
+    months_late: int = 0
 
 
 class LandlordExcelProcessor:
@@ -208,8 +214,12 @@ class LandlordExcelProcessor:
         tenants = self._parse_tenants(worksheet)
         logger.info(f"Loaded {len(tenants)} tenant records from Excel")
         
+        # Get column map for reading payment dates
+        header_row = [cell.value for cell in worksheet[1]]
+        col_map = self._build_column_map(header_row)
+        
         # Prepare receipt data records (NOT submitting to portal)
-        receipts = self._prepare_receipt_records(tenants, selected_month, selected_year)
+        receipts = self._prepare_receipt_records(tenants, selected_month, selected_year, worksheet, col_map)
         logger.info(f"Prepared {len(receipts)} receipt data records, {len(self.processing_alerts)} alerts")
         
         workbook.close()
@@ -332,6 +342,7 @@ class LandlordExcelProcessor:
             'name': None,
             'rent': None,
             'rent_deposit': None,
+            'deposit_month_offset': None,
             'months_late': None,
             'paid_current_month': None,
             'month_columns': {}
@@ -344,30 +355,66 @@ class LandlordExcelProcessor:
             header_str = str(header).strip()
             header_lower = header_str.lower()
             
-            # Map required columns (check most specific patterns first to avoid false matches)
-            # Check "Mês Caução" BEFORE "Caução" to avoid false match
-            if 'mês caução' in header_lower or 'mes caucao' in header_lower or 'paidcurrentmonth' in header_lower.replace(' ', ''):
-                col_map['paid_current_month'] = idx
-            elif 'rentdeposit' in header_lower.replace(' ', '') or 'caução' in header_lower or 'caucao' in header_lower:
-                col_map['rent_deposit'] = idx
-            elif 'atraso' in header_lower or 'monthslate' in header_lower.replace(' ', ''):
-                col_map['months_late'] = idx
-            elif 'contrato' in header_lower or 'contract' in header_lower:
-                col_map['contract'] = idx
-            elif 'nome' in header_lower or 'name' in header_lower:
-                col_map['name'] = idx
-            elif 'renda' in header_lower or ('rent' in header_lower and 'deposit' not in header_lower):
-                col_map['rent'] = idx
+            # Normalize header for better matching (remove spaces, accents, etc.)
+            header_normalized = header_lower.replace(' ', '').replace('ç', 'c').replace('ã', 'a').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
             
-            # Map month columns (text or numeric)
+            # Map required columns - check most specific patterns first to avoid false matches
+            # Priority order matters to avoid mismatches
+            
+            # 1. Contract column
+            if col_map['contract'] is None and ('contrato' in header_normalized or 'contract' in header_normalized):
+                col_map['contract'] = idx
+                logger.debug(f"Mapped 'contract' to column {idx}: {header_str}")
+            
+            # 2. Name column  
+            elif col_map['name'] is None and ('nome' in header_normalized or 'name' in header_normalized or 'tenant' in header_normalized):
+                col_map['name'] = idx
+                logger.debug(f"Mapped 'name' to column {idx}: {header_str}")
+            
+            # 3. Rent column (check it doesn't contain "deposit" to avoid rent_deposit column)
+            elif col_map['rent'] is None and ('renda' in header_normalized or ('rent' in header_normalized and 'deposit' not in header_normalized)):
+                col_map['rent'] = idx
+                logger.debug(f"Mapped 'rent' to column {idx}: {header_str}")
+            
+            # 4. Mes Caucao column (most specific - check this before generic caucao)
+            elif 'mescauca' in header_normalized or 'mescaucao' in header_normalized:
+                # This is the Mes Caucao column - can be numeric offset OR Yes/No
+                col_map['paid_current_month'] = idx
+                col_map['deposit_month_offset'] = idx
+                logger.debug(f"Mapped 'mes_caucao' (paid_current_month + deposit_month_offset) to column {idx}: {header_str}")
+            
+            # 5. Separate PaidCurrentMonth column (if exists)
+            elif col_map['paid_current_month'] is None and 'paidcurrentmonth' in header_normalized:
+                col_map['paid_current_month'] = idx
+                logger.debug(f"Mapped 'paid_current_month' to column {idx}: {header_str}")
+            
+            # 6. Rent Deposit column
+            elif col_map['rent_deposit'] is None and ('rentdeposit' in header_normalized or 'caucao' in header_normalized or 'caucao' in header_normalized or 'deposit' in header_normalized):
+                col_map['rent_deposit'] = idx
+                logger.debug(f"Mapped 'rent_deposit' to column {idx}: {header_str}")
+            
+            # 7. Months Late column
+            elif col_map['months_late'] is None and ('atraso' in header_normalized or 'monthslate' in header_normalized or 'late' in header_normalized):
+                col_map['months_late'] = idx
+                logger.debug(f"Mapped 'months_late' to column {idx}: {header_str}")
+            
+            # 8. Month columns (text or numeric)
+            # Check text month names first
             if header_str in MONTH_COLUMNS:
                 month_num = MONTH_COLUMNS[header_str]
                 col_map['month_columns'][month_num] = idx
-            # Also accept numeric months (01-12)
-            elif header_str.isdigit() and len(header_str) <= 2:
-                month_num = int(header_str)
+                logger.debug(f"Mapped month {month_num} to column {idx}: {header_str}")
+            # Also accept numeric months (01-12 or 1-12)
+            elif header_str.strip().isdigit():
+                month_num = int(header_str.strip())
                 if 1 <= month_num <= 12:
                     col_map['month_columns'][month_num] = idx
+                    logger.debug(f"Mapped month {month_num} to column {idx}: {header_str}")
+        
+        # Log final mapping
+        logger.info(f"Final column mapping: contract={col_map['contract']}, name={col_map['name']}, rent={col_map['rent']}, "
+                   f"rent_deposit={col_map['rent_deposit']}, months_late={col_map['months_late']}, "
+                   f"month_columns={col_map['month_columns']}")
         
         return col_map
     
@@ -444,6 +491,21 @@ class LandlordExcelProcessor:
         if not isinstance(rent_deposit, int) or rent_deposit < 0:
             raise ValueError(f"Invalid RentDeposit: {rent_deposit} (must be non-negative integer)")
         
+        # Extract deposit_month_offset (from "Mês Caução" column if it's numeric)
+        # If Mes Caucao contains a number, use it; otherwise fall back to rent_deposit
+        dmo_idx = col_map['deposit_month_offset']
+        deposit_month_offset = rent_deposit  # Default fallback
+        if dmo_idx is not None and dmo_idx < len(row_values):
+            dmo_value = row_values[dmo_idx]
+            # Only use it if it's a numeric value (not Yes/No string)
+            if isinstance(dmo_value, (int, float)) and dmo_value >= 0:
+                deposit_month_offset = int(dmo_value)
+                logger.debug(f"Using deposit_month_offset from Mes Caucao: {deposit_month_offset}")
+            else:
+                logger.debug(f"Mes Caucao value '{dmo_value}' is not numeric, using rent_deposit: {rent_deposit}")
+        else:
+            logger.debug(f"No Mes Caucao column found, using rent_deposit: {rent_deposit}")
+        
         # Extract months_late
         ml_idx = col_map['months_late']
         if ml_idx is None or ml_idx >= len(row_values):
@@ -454,18 +516,22 @@ class LandlordExcelProcessor:
             raise ValueError(f"Invalid MonthsLate: {months_late} (must be non-negative integer)")
         
         # Extract paid_current_month
+        # If Mes Caucao column contains numeric value, it's used for deposit offset
+        # In that case, default paid_current_month to False
         pcm_idx = col_map['paid_current_month']
-        if pcm_idx is None or pcm_idx >= len(row_values):
-            raise ValueError("Missing PaidCurrentMonth column")
-        
-        paid_current_value = row_values[pcm_idx]
-        paid_current_month = self._parse_yes_no(paid_current_value)
+        paid_current_month = False  # Default
+        if pcm_idx is not None and pcm_idx < len(row_values):
+            paid_current_value = row_values[pcm_idx]
+            # If it's not a number (i.e., it's Yes/No), parse it
+            if not isinstance(paid_current_value, int):
+                paid_current_month = self._parse_yes_no(paid_current_value)
         
         return TenantData(
             contract_number=str(contract).strip(),
             name=str(name).strip() if name else '',
             rent=float(rent),
             rent_deposit=int(rent_deposit),
+            deposit_month_offset=int(deposit_month_offset),
             months_late=int(months_late),
             paid_current_month=paid_current_month,
             row_number=row_number
@@ -491,7 +557,9 @@ class LandlordExcelProcessor:
         self,
         tenants: List[TenantData],
         selected_month: int,
-        selected_year: int
+        selected_year: int,
+        worksheet: Worksheet,
+        col_map: dict
     ) -> List[ReceiptData]:
         """
         Prepare receipt data records from tenant information.
@@ -501,36 +569,105 @@ class LandlordExcelProcessor:
             tenants: List of tenant data
             selected_month: Target month (1-12)
             selected_year: Target year
+            worksheet: Excel worksheet to read payment dates from
+            col_map: Column mapping dictionary
         
         Returns:
             List of ReceiptData objects ready for CSV export
         """
         receipts = []
         
+        # Month names for logging
+        month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        
+        # Get the column index for the selected month
+        month_col_idx = col_map['month_columns'].get(selected_month)
+        
+        if month_col_idx is None:
+            logger.error(f"Month {selected_month} column not found in Excel. Cannot process receipts without payment date column.")
+            return receipts  # Return empty list
+        
         for tenant in tenants:
             logger.debug(f"Processing contract {tenant.contract_number}: {tenant.name}")
             
-            # For now, create one receipt per tenant for the selected month
-            # In a full implementation, this would check payment dates in month columns
-            # and create receipts based on actual payment information
-            
-            # Calculate rent period dates (from_date, to_date)
-            # Simplified: assume payment on 1st of selected month
+            # Read the payment date from the month column cell for this tenant's row
             from datetime import date as date_cls
-            payment_date = date_cls(selected_year, selected_month, 1)
+            import datetime as dt
             
-            # Calculate rent period based on rent_deposit
-            # If rent_deposit = 1, paying for next month
-            from_month = selected_month + tenant.rent_deposit
+            payment_date = None
+            payment_day = None
+            
+            if month_col_idx is not None:
+                # Get the cell value from the selected month column for this tenant's row
+                # month_col_idx is 0-based, openpyxl uses 1-based columns
+                try:
+                    cell_value = worksheet.cell(row=tenant.row_number, column=month_col_idx + 1).value
+                    logger.debug(f"  Reading from row {tenant.row_number}, column {month_col_idx + 1}, value: {cell_value}")
+                    
+                    # Skip this tenant if cell is empty - no payment date means no payment
+                    if cell_value is None or (isinstance(cell_value, str) and cell_value.strip() == ""):
+                        logger.info(f"  Skipping {tenant.name} (contract {tenant.contract_number}) - no payment date in {month_names[selected_month-1]} column")
+                        continue
+                    elif isinstance(cell_value, dt.datetime):
+                        payment_day = cell_value.day
+                        logger.debug(f"  Read payment date from cell: day {payment_day}")
+                    elif isinstance(cell_value, dt.date):
+                        payment_day = cell_value.day
+                        logger.debug(f"  Read payment date from cell: day {payment_day}")
+                    elif isinstance(cell_value, (int, float)):
+                        # If it's a number, assume it's the day of month
+                        payment_day = int(cell_value)
+                        logger.debug(f"  Read payment day from cell: {payment_day}")
+                    elif isinstance(cell_value, str):
+                        # Try to parse as full date first (dd-mm-yyyy format)
+                        try:
+                            parsed_date = dt.datetime.strptime(cell_value.strip(), "%d-%m-%Y")
+                            payment_day = parsed_date.day
+                            logger.debug(f"  Parsed payment date from dd-mm-yyyy string: {cell_value} -> day {payment_day}")
+                        except ValueError:
+                            # Try to parse as number (day of month)
+                            try:
+                                payment_day = int(cell_value)
+                                logger.debug(f"  Parsed payment day from string: {payment_day}")
+                            except ValueError:
+                                logger.warning(f"  Skipping {tenant.name} (contract {tenant.contract_number}) - could not parse payment date '{cell_value}'")
+                                continue
+                    else:
+                        logger.warning(f"  Skipping {tenant.name} (contract {tenant.contract_number}) - unknown payment date cell type: {type(cell_value)}")
+                        continue
+                        
+                except Exception as e:
+                    logger.warning(f"  Skipping {tenant.name} (contract {tenant.contract_number}) - error reading payment date: {e}")
+                    continue
+            else:
+                logger.warning(f"  Skipping {tenant.name} (contract {tenant.contract_number}) - no month column found for {month_names[selected_month-1]}")
+                continue
+            
+            # Validate day is within valid range
+            import calendar
+            max_day = calendar.monthrange(selected_year, selected_month)[1]
+            if payment_day < 1 or payment_day > max_day:
+                logger.warning(f"  Skipping {tenant.name} (contract {tenant.contract_number}) - invalid payment day {payment_day} (must be 1-{max_day})")
+                continue
+            
+            # Create payment date
+            payment_date = date_cls(selected_year, selected_month, payment_day)
+            
+            # Calculate rent period based on deposit_month_offset (from "Mês Caução" column)
+            # Formula: selected_month + mês_caução
+            # Example: Feb(2) + 2 = April(4) - paying 2 months in advance
+            from_month = selected_month + tenant.deposit_month_offset
             from_year = selected_year
-            if from_month > 12:
+            
+            # Handle month overflow
+            while from_month > 12:
                 from_month -= 12
                 from_year += 1
             
             from_date = date_cls(from_year, from_month, 1)
             
             # to_date is last day of from_month
-            import calendar
             last_day = calendar.monthrange(from_year, from_month)[1]
             to_date = date_cls(from_year, from_month, last_day)
             
@@ -541,10 +678,12 @@ class LandlordExcelProcessor:
                 to_date=to_date,
                 payment_date=payment_date,
                 receipt_type="rent",
-                value=tenant.rent
+                value=tenant.rent,
+                rent_deposit=tenant.rent_deposit,
+                months_late=tenant.months_late
             )
             receipts.append(receipt)
-            logger.debug(f"Created receipt record for {tenant.name}")
+            logger.debug(f"Created receipt record for {tenant.name} with payment date {payment_date}")
         
         logger.info(f"Prepared {len(receipts)} receipt records from {len(tenants)} tenants")
         return receipts

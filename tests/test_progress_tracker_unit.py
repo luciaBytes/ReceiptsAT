@@ -358,3 +358,47 @@ class TestResultsCollection:
         assert len(tracker.results) == 3
         assert tracker.completed_operations == 2
         assert tracker.failed_operations == 1
+
+
+class TestProgressAttributes:
+    """Test progress tracker attributes and properties."""
+    
+    def test_tracks_total_operations(self):
+        """Test that total operations are tracked."""
+        tracker = ProgressTracker()
+        tracker.start(10)
+        
+        assert tracker.total_operations == 10
+        assert tracker.completed_operations == 0
+        assert tracker.failed_operations == 0
+    
+    def test_tracks_progress_after_updates(self):
+        """Test tracking after operations complete."""
+        tracker = ProgressTracker()
+        tracker.start(5)
+        
+        tracker.update(OperationResult("op_1", OperationStatus.COMPLETED, "Done"))
+        tracker.update(OperationResult("op_2", OperationStatus.COMPLETED, "Done"))
+        
+        assert tracker.completed_operations == 2
+        assert tracker.total_operations == 5
+        assert len(tracker.results) == 2
+
+
+class TestReset:
+    """Test reset functionality."""
+    
+    def test_reset_after_operations(self):
+        """Test that reset clears all tracking data."""
+        tracker = ProgressTracker()
+        tracker.start(5)
+        
+        tracker.update(OperationResult("op_1", OperationStatus.COMPLETED, "Done"))
+        tracker.update(OperationResult("op_2", OperationStatus.FAILED, "Error"))
+        
+        tracker.reset()
+        
+        assert tracker.total_operations == 0
+        assert tracker.completed_operations == 0
+        assert tracker.failed_operations == 0
+        assert len(tracker.results) == 0

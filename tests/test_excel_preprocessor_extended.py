@@ -170,18 +170,20 @@ class TestCellTypeCoercion:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['12345', 'John Doe', 1000.00, 1, 0, 'No']  # Numeric values as float/int
+        row_values = ['12345', 'John Doe', 1000.00, 1, 1, 0, 'No']  # Numeric values as float/int
         
         tenant = processor._parse_tenant_row(row_values, col_map, 2)
         
         assert tenant.contract_number == '12345'
         assert tenant.rent == 1000.00
         assert tenant.rent_deposit == 1
+        assert tenant.deposit_month_offset == 1
         assert tenant.months_late == 0
     
     def test_parse_tenant_row_with_boolean_values(self):
@@ -193,18 +195,19 @@ class TestCellTypeCoercion:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
         # Test with 'Yes'
-        row_values = ['12345', 'John Doe', 1000.00, 1, 0, 'Yes']
+        row_values = ['12345', 'John Doe', 1000.00, 1, 1, 0, 'Yes']
         tenant = processor._parse_tenant_row(row_values, col_map, 2)
         assert tenant.paid_current_month is True
         
         # Test with 'No'
-        row_values[5] = 'No'
+        row_values[6] = 'No'
         tenant = processor._parse_tenant_row(row_values, col_map, 2)
         assert tenant.paid_current_month is False
     
@@ -217,13 +220,14 @@ class TestCellTypeCoercion:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
         # All integer values should be int type, not None
-        row_values = ['12345', 'John Doe', 1000.00, 1, 0, 'No']
+        row_values = ['12345', 'John Doe', 1000.00, 1, 1, 0, 'No']
         tenant = processor._parse_tenant_row(row_values, col_map, 2)
         
         assert tenant.months_late == 0
@@ -261,36 +265,42 @@ class TestEmptyRowFiltering:
         mock_worksheet = Mock()
         
         # Header row
-        header_cells = [Mock() for _ in range(6)]
+        header_cells = [Mock() for _ in range(8)]
         header_cells[0].value = 'Contract'
         header_cells[1].value = 'Name'
         header_cells[2].value = 'Rent'
         header_cells[3].value = 'RentDeposit'
-        header_cells[4].value = 'MonthsLate'
-        header_cells[5].value = 'PaidCurrentMonth'
+        header_cells[4].value = 'Mes Caucao'
+        header_cells[5].value = 'MonthsLate'
+        header_cells[6].value = 'PaidCurrentMonth'
+        header_cells[7].value = 'Jan'
         
         # Data row 1 (valid)
-        row1_cells = [Mock() for _ in range(6)]
+        row1_cells = [Mock() for _ in range(8)]
         row1_cells[0].value = '12345'
         row1_cells[1].value = 'John Doe'
         row1_cells[2].value = 1000.00
         row1_cells[3].value = 1
         row1_cells[4].value = 0
-        row1_cells[5].value = 'No'
+        row1_cells[5].value = 1  # Mes Caucao
+        row1_cells[6].value = 0
+        row1_cells[7].value = 'No'
         
         # Data row 2 (empty)
-        row2_cells = [Mock() for _ in range(6)]
+        row2_cells = [Mock() for _ in range(8)]
         for cell in row2_cells:
             cell.value = None
         
         # Data row 3 (valid)
-        row3_cells = [Mock() for _ in range(6)]
+        row3_cells = [Mock() for _ in range(8)]
         row3_cells[0].value = '67890'
         row3_cells[1].value = 'Jane Smith'
         row3_cells[2].value = 1500.00
         row3_cells[3].value = 1
         row3_cells[4].value = 0
-        row3_cells[5].value = 'No'
+        row3_cells[5].value = 1  # Mes Caucao
+        row3_cells[6].value = 0
+        row3_cells[7].value = 'No'
         
         mock_worksheet.__getitem__ = lambda self, idx: header_cells if idx == 1 else []
         mock_worksheet.iter_rows.return_value = [row1_cells, row2_cells, row3_cells]
@@ -415,13 +425,27 @@ class TestPaymentDateCalculation:
             name='John Doe',
             rent=1000.00,
             rent_deposit=1,
+            deposit_month_offset=1,
             months_late=0,
             paid_current_month=False,
             row_number=2
         )
         
-        # Call the method - it will process but may return empty list if no payments found
-        receipts = processor._prepare_receipt_records([tenant], 1, 2025)
+        # Mock a minimal worksheet with required structure
+        mock_worksheet = Mock()
+        col_map = {
+            'contract': 0,
+            'name': 1,
+            'rent': 2,
+            'rent_deposit': 3,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
+            'month_columns': {1: 7}  # January in column 7
+        }
+        
+        # Call the method with all required parameters
+        receipts = processor._prepare_receipt_records([tenant], 1, 2025, mock_worksheet, col_map)
         
         # Should return a list (may be empty if no payment column data)
         assert isinstance(receipts, list)

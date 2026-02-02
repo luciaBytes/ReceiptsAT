@@ -8,11 +8,10 @@ import os
 import tempfile
 from datetime import datetime, timedelta
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.csv_handler import CSVHandler
+from csv_handler import CSVHandler
 
 def test_payment_date_scenarios():
     """Test various payment date scenarios."""

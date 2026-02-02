@@ -292,3 +292,5 @@ class TestContractsCacheManagement:
         # Old cache should be cleared
         assert 'old' not in processor._contracts_data_cache
         assert '123' in processor._contracts_data_cache
+
+

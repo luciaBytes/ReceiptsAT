@@ -208,7 +208,9 @@ class ReceiptsTheme:
                        font=('Segoe UI', 10))
         style.map('TCombobox',
                  fieldbackground=[('readonly', cls.WHITE)],
-                 selectbackground=[('readonly', cls.BLUE_PALE)])
+                 foreground=[('readonly', cls.TEXT_BLACK)],
+                 selectbackground=[('readonly', cls.BLUE_PALE)],
+                 selectforeground=[('readonly', cls.TEXT_BLACK)])
         
         # ===== Checkbutton and Radiobutton Styles =====
         style.configure('TCheckbutton',

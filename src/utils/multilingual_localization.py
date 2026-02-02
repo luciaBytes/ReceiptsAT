@@ -175,8 +175,8 @@ class MultilingualTexts:
     
     # Action buttons
     VALIDATE_CONTRACTS_BUTTON = {
-        "pt": "Validar Contratos",
-        "en": "Validate Contracts"
+        "pt": "Mostrar Contratos Válidos",
+        "en": "Show Valid Contracts"
     }
     PROCESS_RECEIPTS_BUTTON = {
         "pt": "Processar Recibos",
@@ -226,6 +226,10 @@ class MultilingualTexts:
     QUICK_IMPORT_TAB = {
         "pt": "Importacao Rapida",
         "en": "Quick Import"
+    }
+    API_MONITOR_TAB = {
+        "pt": "Monitor de API",
+        "en": "API Monitor"
     }
     
     # ==============================================

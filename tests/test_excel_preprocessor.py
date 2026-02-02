@@ -33,6 +33,7 @@ class TestTenantDataClass:
             name='John Doe',
             rent=500.00,
             rent_deposit=1,
+            deposit_month_offset=1,
             months_late=0,
             paid_current_month=False,
             row_number=2
@@ -42,6 +43,7 @@ class TestTenantDataClass:
         assert tenant.name == 'John Doe'
         assert tenant.rent == 500.00
         assert tenant.rent_deposit == 1
+        assert tenant.deposit_month_offset == 1
         assert tenant.months_late == 0
         assert tenant.paid_current_month is False
         assert tenant.row_number == 2
@@ -52,7 +54,7 @@ class TestPaymentInfoClass:
     
     def test_payment_info_creation(self):
         """Test creating PaymentInfo object."""
-        tenant = TenantData('12345', 'John', 500.0, 1, 0, False, 2)
+        tenant = TenantData('12345', 'John', 500.0, 1, 1, 0, False, 2)
         payment = PaymentInfo(
             tenant=tenant,
             payment_date=date(2026, 6, 5),
@@ -254,12 +256,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['12345', 'John Doe', 500.0, 1, 0, 'No']
+        row_values = ['12345', 'John Doe', 500.0, 1, 1, 0, 'No']
         
         tenant = processor._parse_tenant_row(row_values, col_map, 2)
         
@@ -267,6 +270,7 @@ class TestTenantRowParsing:
         assert tenant.name == 'John Doe'
         assert tenant.rent == 500.0
         assert tenant.rent_deposit == 1
+        assert tenant.deposit_month_offset == 1
         assert tenant.months_late == 0
         assert tenant.paid_current_month is False
         assert tenant.row_number == 2
@@ -280,16 +284,17 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['67890', 'Jane Smith', 800.0, 2, 0, 'Yes']
+        row_values = ['12346', 'Jane Smith', 600.0, 0, 1, 0, 'Yes']
         
         tenant = processor._parse_tenant_row(row_values, col_map, 3)
         
-        assert tenant.contract_number == '67890'
+        assert tenant.contract_number == '12346'
         assert tenant.paid_current_month is True
     
     def test_parse_tenant_with_months_late(self):
@@ -301,12 +306,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['11111', 'Paul Late', 600.0, 1, 2, 'No']
+        row_values = ['11111', 'Paul Late', 600.0, 1, 1, 2, 'No']
         
         tenant = processor._parse_tenant_row(row_values, col_map, 4)
         
@@ -321,12 +327,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['', 'John Doe', 500.0, 1, 0, 'No']
+        row_values = ['', 'Unknown', 600.0, 1, 1, 0, 'No']
         
         with pytest.raises(ValueError, match="Missing contract number"):
             processor._parse_tenant_row(row_values, col_map, 2)
@@ -340,12 +347,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['12345', 'John Doe', 'invalid', 1, 0, 'No']
+        row_values = ['12345', 'John Doe', 'invalid', 1, 1, 0, 'No']
         
         with pytest.raises(ValueError, match="Invalid rent amount"):
             processor._parse_tenant_row(row_values, col_map, 2)
@@ -359,12 +367,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['12345', 'John Doe', -500.0, 1, 0, 'No']
+        row_values = ['12345', 'John Doe', -500.0, 1, 1, 0, 'No']
         
         with pytest.raises(ValueError, match="Invalid rent amount"):
             processor._parse_tenant_row(row_values, col_map, 2)
@@ -378,12 +387,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['12345', 'John Doe', 500.0, 'invalid', 0, 'No']
+        row_values = ['12345', 'John Doe', 500.0, 'invalid', 1, 0, 'No']
         
         with pytest.raises(ValueError, match="Invalid RentDeposit"):
             processor._parse_tenant_row(row_values, col_map, 2)
@@ -397,12 +407,13 @@ class TestTenantRowParsing:
             'name': 1,
             'rent': 2,
             'rent_deposit': 3,
-            'months_late': 4,
-            'paid_current_month': 5,
+            'deposit_month_offset': 4,
+            'months_late': 5,
+            'paid_current_month': 6,
             'month_columns': {}
         }
         
-        row_values = ['12345', 'John Doe', 500.0, 1, 'late', 'No']
+        row_values = ['12345', 'John Doe', 500.0, 1, 1, 'late', 'No']
         
         with pytest.raises(ValueError, match="Invalid MonthsLate"):
             processor._parse_tenant_row(row_values, col_map, 2)

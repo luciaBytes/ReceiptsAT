@@ -160,9 +160,47 @@ class TestGetVersionInfo:
         if hasattr(version, 'get_version_info'):
             assert callable(version.get_version_info)
     
-    @patch('src.utils.version.get_version', return_value='1.2.3')
+    @patch('utils.version.get_version', return_value='1.2.3')
     def test_get_version_info_returns_dict(self, mock_get_version):
         """Test get_version_info returns structured data if implemented."""
         if hasattr(version, 'get_version_info'):
             result = version.get_version_info()
             assert isinstance(result, dict)
+
+
+class TestVersionFormatting:
+    """Test version string formatting and handling."""
+    
+    @patch('os.path.exists')
+    @patch('builtins.open', new_callable=mock_open, read_data='v1.2.3\n')
+    def test_version_with_leading_v(self, mock_file, mock_exists):
+        """Test handling of version strings with leading 'v'."""
+        mock_exists.return_value = True
+        
+        result = version.get_version()
+        # Should handle both with and without 'v' prefix
+        assert '1.2.3' in result
+    
+    @patch('os.path.exists')
+    @patch('builtins.open', new_callable=mock_open, read_data='1.2.3-beta\n')
+    def test_version_with_suffix(self, mock_file, mock_exists):
+        """Test version strings with suffixes like -beta, -alpha."""
+        mock_exists.return_value = True
+        
+        result = version.get_version()
+        assert '1.2.3' in result
+
+
+class TestModuleFunctions:
+    """Test module-level functions and attributes."""
+    
+    def test_version_module_has_get_version(self):
+        """Test that get_version function exists."""
+        assert hasattr(version, 'get_version')
+        assert callable(version.get_version)
+    
+    def test_get_version_returns_string(self):
+        """Test that get_version always returns a string."""
+        result = version.get_version()
+        assert isinstance(result, str)
+        assert len(result) > 0

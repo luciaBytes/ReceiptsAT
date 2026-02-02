@@ -1386,6 +1386,8 @@ class WebClient:
                         return False, {
                             'success': False,
                             'error': error_msg,
+                            'errorMessage': error_msg,
+                            'fieldErrors': field_errors,
                             'platform_response': response_data
                         }
                         
