@@ -4,13 +4,18 @@ Test pre-filled CSV generation functionality
 import pytest
 import tempfile
 import os
+import sys
 from unittest.mock import Mock, patch
-from src.web_client import WebClient
+
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from web_client import WebClient
 
 
 class TestPrefilledCSVGeneration:
     
-    @patch('src.web_client.WebClient.generate_prefilled_csv')
+    @patch('web_client.WebClient.generate_prefilled_csv')
     def test_prefilled_csv_not_authenticated(self, mock_generate_csv):
         """Test CSV generation fails properly when not authenticated."""
         client = WebClient()
@@ -21,8 +26,8 @@ class TestPrefilledCSVGeneration:
         assert not success
         assert result == "Not authenticated"
     
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
-    @patch('src.web_client.WebClient.get_contract_rent_value')
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contract_rent_value')
     def test_prefilled_csv_no_contracts(self, mock_get_rent, mock_get_contracts):
         """Test CSV generation when no contracts are found."""
         client = WebClient()
@@ -35,8 +40,8 @@ class TestPrefilledCSVGeneration:
         assert not success
         assert "No contracts found to generate CSV" in result
     
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
-    @patch('src.web_client.WebClient.get_contract_rent_value')
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contract_rent_value')
     def test_prefilled_csv_no_rent_values(self, mock_get_rent, mock_get_contracts):
         """Test CSV generation when contracts exist but have no rent values."""
         client = WebClient()
@@ -60,8 +65,8 @@ class TestPrefilledCSVGeneration:
             csv_files = [f for f in os.listdir(temp_dir) if f.endswith('.csv')]
             assert len(csv_files) == 0
     
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
-    @patch('src.web_client.WebClient.get_contract_rent_value')
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contract_rent_value')
     def test_prefilled_csv_success(self, mock_get_rent, mock_get_contracts):
         """Test successful CSV generation with valid contracts and rent values."""
         client = WebClient()
@@ -94,8 +99,8 @@ class TestPrefilledCSVGeneration:
                 assert '500.00' in content
                 assert '750.50' in content
     
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
-    @patch('src.web_client.WebClient.get_contract_rent_value')
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contract_rent_value')
     def test_prefilled_csv_mixed_results(self, mock_get_rent, mock_get_contracts):
         """Test CSV generation when some contracts have rent values and others don't."""
         client = WebClient()
@@ -130,8 +135,8 @@ class TestPrefilledCSVGeneration:
                 assert '500.00' in content
                 assert '300.25' in content
 
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
-    @patch('src.web_client.WebClient.get_contract_rent_value') 
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contract_rent_value') 
     def test_prefilled_csv_content_format(self, mock_get_rent, mock_get_contracts):
         """Test the detailed CSV content format and structure."""
         from datetime import date, datetime
@@ -202,7 +207,7 @@ class TestPrefilledCSVGeneration:
                 # payment_date should be today
                 assert row[3] == today.strftime('%Y-%m-%d')
 
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
     def test_prefilled_csv_platform_response_simulation(self, mock_get_contracts):
         """Test CSV generation with simulated realistic platform response."""
         client = WebClient()
@@ -279,9 +284,8 @@ class TestPrefilledCSVGeneration:
             lines = content.strip().split('\n')
             assert len(lines) == 4  # Header + 3 valid contracts
 
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
-    @patch('os.path.exists')
-    def test_prefilled_csv_save_directory_fallback(self, mock_exists, mock_get_contracts):
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
+    def test_prefilled_csv_save_directory_fallback(self, mock_get_contracts):
         """Test CSV save directory fallback logic."""
         client = WebClient()
         client.authenticated = True
@@ -291,21 +295,20 @@ class TestPrefilledCSVGeneration:
             {'numero': '12345', 'valorRenda': 500.00, 'estado': {'codigo': 'ACTIVO', 'label': 'Ativo'}}
         ], "Success")
         
-        # Mock directory existence checks for fallback logic
-        mock_exists.side_effect = lambda path: 'Desktop' in path
-        
-        # Test without specifying save directory (should use fallback)
-        success, result = client.generate_prefilled_csv()
-        
-        assert success
-        assert result.endswith('.csv')
-        assert 'prefilled_receipts_' in result
-        # Should contain timestamp
-        import re
-        timestamp_pattern = r'prefilled_receipts_\d{8}_\d{6}\.csv'
+        # Use a temporary directory for testing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test with specifying save directory
+            success, result = client.generate_prefilled_csv(save_directory=temp_dir)
+            
+            assert success
+            assert result.endswith('.csv')
+            assert 'prefilled_receipts_' in result
+            # Should contain timestamp
+            import re
+            timestamp_pattern = r'prefilled_receipts_\d{8}_\d{6}\.csv'
         assert re.search(timestamp_pattern, result)
 
-    @patch('src.web_client.WebClient.get_contracts_with_tenant_data')
+    @patch('web_client.WebClient.get_contracts_with_tenant_data')
     def test_prefilled_csv_encoding_and_special_characters(self, mock_get_contracts):
         """Test CSV generation with Portuguese characters and special names."""
         client = WebClient()

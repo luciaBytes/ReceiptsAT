@@ -11,14 +11,13 @@ import json
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.web_client import WebClient
-from src.receipt_processor import ReceiptProcessor
-from src.csv_handler import ReceiptData
-from src.utils.logger import get_logger
+from web_client import WebClient
+from receipt_processor import ReceiptProcessor
+from csv_handler import ReceiptData
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

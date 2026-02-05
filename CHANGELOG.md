@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ New Features
+- **API Monitor Tab**: Added dedicated API Monitor tab to main interface
+  - Moved API Monitor functionality from modal dialog to permanent tab alongside Smart Import and Quick Import
+  - Provides real-time monitoring of Portal das Finanças API changes
+  - Features three sub-tabs: Overview (statistics), Changes (detected alterations), History (monitoring timeline)
+  - Includes control buttons for manual checks, full reports, configuration, and history management
+  - Dark theme integration matching application design
+  - Improved accessibility and workflow efficiency
+
+### 🐛 Bug Fixes
+- **Excel Payment Date Parsing**: Fixed payment date extraction from Excel files to support dd-mm-yyyy format
+  - Now correctly parses full date strings like "09-01-2026" from Excel cells
+  - Maintains backward compatibility with existing formats (integers, datetime objects)
+  - Handles leading/trailing spaces in date strings
+  - Supports both single-digit and double-digit day values
+  - Provides comprehensive logging of date parsing process
+- **Smart Import Button States**: Fixed processing buttons not enabling after CSV generation
+  - Process receipts, cancel, and validate contracts buttons now enable automatically after generating CSV from Excel
+  - Receipts loaded directly into CSV handler for immediate processing
+  - No need to manually download and reload CSV file
+- **Smart Import Processing Error**: Fixed "dict object has no attribute contract_id" error
+  - Smart Import now uses CSV handler receipts directly, matching Quick Import behavior
+  - Processing calls identical between Smart Import and Quick Import tabs
+  - Resolves AttributeError when clicking process receipts button
+- **Step-by-Step Dialog Text Color**: Fixed unreadable text in receipt confirmation dialog
+  - All receipt information fields (contract ID, period, payment date, value, receipt type) now display in black
+  - Improved readability of receipt details during step-by-step processing
+  - Text properly visible against white entry field backgrounds
+- **Combobox Text Readability**: Fixed text contrast in month/year selection dropdowns
+  - Both displayed and selected text now show in black for consistent readability
+  - Resolves issue where month selection became unreadable after selecting year
+  - Improved visibility against white dropdown background in Smart Import tab
+
 ### 🎯 Enhancements
+- **Smart Import Enhanced UI**: Added CSV file loading and processing results sections
+  - CSV File section allows browsing and loading external CSV files
+  - Processing Results section displays processing summary
+  - Unified workflow matching Quick Import functionality
+  - Improved user experience with consistent interface across tabs
+- **Simplified Navigation**: Removed redundant API Monitor buttons from Smart Import and Quick Import tabs
+  - API Monitor now accessible only via dedicated tab
+  - Cleaner interface with reduced button clutter
+  - Streamlined workflow focused on receipt processing
 - **Active Contracts Filtering**: Prefilled CSV generation now only includes active contracts (estado.codigo == 'ACTIVO')
   - Filters out terminated, inactive, and cancelled contracts
   - Reduces clutter in generated CSV files

@@ -37,6 +37,10 @@ class ProcessingResult:
     error_message: str = ""
     timestamp: str = ""
     status: str = ""  # 'Success', 'Failed', 'Skipped'
+    rent_deposit: int = 0  # Months paid in advance (from Excel)
+    months_late: int = 0  # Months behind on payment (from Excel)
+    months_in_advance: int = 0  # Same as rent_deposit, for clarity
+    field_errors: str = ""  # Field-specific error messages from API
 
 class ReceiptProcessor:
     """Main processor for handling receipt issuance."""
@@ -406,7 +410,10 @@ class ReceiptProcessor:
             from_date=receipt.from_date,
             to_date=receipt.to_date,
             value=receipt.value,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
+            rent_deposit=getattr(receipt, 'rent_deposit', 0),
+            months_late=getattr(receipt, 'months_late', 0),
+            months_in_advance=getattr(receipt, 'rent_deposit', 0)
         )
         
         if self.dry_run:
@@ -537,6 +544,12 @@ class ReceiptProcessor:
                     # Extract error message from response or use fallback
                     if response:
                         result.error_message = response.get('error', response.get('errorMessage', 'Unknown error'))
+                        # Capture field errors if present
+                        field_errors = response.get('fieldErrors', {})
+                        if field_errors:
+                            # Format field errors as readable string
+                            error_parts = [f"{field}: {error}" for field, error in field_errors.items()]
+                            result.field_errors = "; ".join(error_parts)
                     else:
                         result.error_message = "No response received from platform"
                     result.status = "Failed"
@@ -763,9 +776,9 @@ class ReceiptProcessor:
             "hasNifHerancaIndivisa": form_data.get('contract_details', {}).get('hasNifHerancaIndivisa', False),
             "locadoresHerancaIndivisa": form_data.get('contract_details', {}).get('locadoresHerancaIndivisa', []),
             "herdeiros": form_data.get('contract_details', {}).get('herdeiros', []),
-            "dataInicio": receipt.from_date,
-            "dataFim": receipt.to_date,
-            "dataRecebimento": receipt.payment_date,  # Payment date is now required
+            "dataInicio": receipt.from_date.strftime('%Y-%m-%d') if hasattr(receipt.from_date, 'strftime') else str(receipt.from_date),
+            "dataFim": receipt.to_date.strftime('%Y-%m-%d') if hasattr(receipt.to_date, 'strftime') else str(receipt.to_date),
+            "dataRecebimento": receipt.payment_date.strftime('%Y-%m-%d') if hasattr(receipt.payment_date, 'strftime') else str(receipt.payment_date),
             "tipoImportancia": {
                 "codigo": "RENDAC",
                 "label": "Renda"
@@ -857,3 +870,65 @@ class ReceiptProcessor:
             })
         
         return report_data
+    
+    def generate_session_export_data(self) -> List[Dict[str, Any]]:
+        """
+        Generate session export data with 2 rows per issued receipt.
+        
+        First row: Contract Number, Name, Rent, Deposit, Months in Advance, Late Months, Payment Date
+        Second row: Empty cells except for receipt issue date below Payment Date
+        
+        Note: Deposit, Months in Advance, and Late Months fields are populated from Smart Import (Excel),
+        but will be empty for Quick Import (CSV) processing.
+        
+        Returns:
+            List of dictionaries representing the 2-row format for each receipt
+        """
+        export_data = []
+        
+        for result in self.results:
+            # Only export successfully issued receipts
+            if not result.success:
+                continue
+            
+            # Use the fields from ProcessingResult (populated by Smart Import)
+            rent_deposit = str(result.rent_deposit) if result.rent_deposit else ""
+            months_in_advance = str(result.months_in_advance) if result.months_in_advance else str(result.rent_deposit) if result.rent_deposit else ""
+            months_late = str(result.months_late) if result.months_late else ""
+            
+            # First row: main receipt information
+            first_row = {
+                'Contract Number': result.contract_id,
+                'Name': result.tenant_name,
+                'Rent': f"{result.value:.2f}" if result.value else "",
+                'Deposit': rent_deposit,
+                'Months in Advance': months_in_advance,
+                'Late Months': months_late,
+                'Payment Date': result.payment_date
+            }
+            export_data.append(first_row)
+            
+            # Second row: only receipt issue date (below Payment Date column)
+            # Extract issue date from timestamp
+            issue_date = datetime.now().strftime('%Y-%m-%d')
+            if result.timestamp:
+                try:
+                    # Parse timestamp to extract date
+                    timestamp_obj = datetime.fromisoformat(result.timestamp)
+                    issue_date = timestamp_obj.strftime('%Y-%m-%d')
+                except:
+                    pass
+            
+            second_row = {
+                'Contract Number': '',
+                'Name': '',
+                'Rent': '',
+                'Deposit': '',
+                'Months in Advance': '',
+                'Late Months': '',
+                'Payment Date': issue_date  # Receipt issue date goes here
+            }
+            export_data.append(second_row)
+        
+        logger.info(f"Generated session export data: {len(export_data)} rows ({len(export_data)//2} receipts)")
+        return export_data

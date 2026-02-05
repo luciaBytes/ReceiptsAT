@@ -9,14 +9,13 @@ from unittest.mock import Mock, patch
 from datetime import datetime
 import json
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.csv_handler import CSVHandler
-from src.web_client import WebClient
-from src.receipt_processor import ReceiptProcessor
-from src.utils.logger import get_logger
+from csv_handler import CSVHandler
+from web_client import WebClient
+from receipt_processor import ReceiptProcessor
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -27,6 +26,7 @@ def test_sample_receipts():
     print("=" * 80)
     
     # Path to the sample CSV file
+    project_root = os.path.join(os.path.dirname(__file__), '..')
     csv_file_path = os.path.join(project_root, 'sample', 'sample_receipts.csv')
     
     if not os.path.exists(csv_file_path):

@@ -6,10 +6,14 @@ Tests text retrieval, language switching, and multilingual interface support.
 import unittest
 from unittest.mock import patch, MagicMock
 import os
+import sys
 import tempfile
 import json
 
-from src.utils.multilingual_localization import (
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from utils.multilingual_localization import (
     MultilingualTexts,
     MultilingualLocalizer,
     get_text,
@@ -289,7 +293,7 @@ class TestLanguagePreferences(unittest.TestCase):
         
         try:
             # Temporarily patch the config file path
-            import src.utils.multilingual_localization as ml_module
+            import utils.multilingual_localization as ml_module
             original_config = ml_module._config_file
             ml_module._config_file = temp_path
             

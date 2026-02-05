@@ -6,11 +6,13 @@ Test the flexible_order_receipts.csv file with different column order.
 import sys
 import os
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+# Add the src directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.csv_handler import CSVHandler
+# Get the actual project root (parent of tests directory)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+from csv_handler import CSVHandler
 
 def test_flexible_order_sample():
     """Test loading the flexible order sample file."""

@@ -60,6 +60,11 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Agents
+_bmad/
+_bmad-output/
+.github/agents/
+
 # Translations
 *.mo
 *.pot
