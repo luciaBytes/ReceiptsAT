@@ -279,6 +279,11 @@ class MainWindow:
         )
         self.notebook.add(self.smart_import_tab, text=get_text('SMART_IMPORT_TAB'))
         
+        # Create references to SmartImportTab buttons for MainWindow methods
+        self.start_button = self.smart_import_tab.start_button
+        self.stop_button = self.smart_import_tab.stop_button
+        self.validate_button = self.smart_import_tab.validate_button
+        
         # API Monitor tab
         self.api_monitor_tab = APIMonitorTab(self.notebook)
         self.notebook.add(self.api_monitor_tab, text=get_text('API_MONITOR_TAB'))

@@ -356,7 +356,19 @@ class LandlordExcelProcessor:
             header_lower = header_str.lower()
             
             # Normalize header for better matching (remove spaces, accents, etc.)
-            header_normalized = header_lower.replace(' ', '').replace('ç', 'c').replace('ã', 'a').replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+            # Include all Portuguese accent variations
+            header_normalized = (header_lower
+                .replace(' ', '')
+                .replace(',', '')  # Remove commas
+                .replace('ç', 'c')
+                .replace('ã', 'a').replace('á', 'a').replace('â', 'a').replace('à', 'a')
+                .replace('é', 'e').replace('ê', 'e').replace('è', 'e')
+                .replace('í', 'i').replace('î', 'i')
+                .replace('õ', 'o').replace('ó', 'o').replace('ô', 'o').replace('ò', 'o')
+                .replace('ú', 'u').replace('û', 'u').replace('ù', 'u')
+            )
+            
+            logger.debug(f"Column {idx}: '{header_str}' → normalized: '{header_normalized}'")
             
             # Map required columns - check most specific patterns first to avoid false matches
             # Priority order matters to avoid mismatches
@@ -377,7 +389,8 @@ class LandlordExcelProcessor:
                 logger.debug(f"Mapped 'rent' to column {idx}: {header_str}")
             
             # 4. Mes Caucao column (most specific - check this before generic caucao)
-            elif 'mescauca' in header_normalized or 'mescaucao' in header_normalized:
+            # Match: "Mês Caução", "Mes Caucao", "MesCaucao", etc.
+            elif ('mes' in header_normalized and 'cauc' in header_normalized) or 'mescauc' in header_normalized:
                 # This is the Mes Caucao column - can be numeric offset OR Yes/No
                 col_map['paid_current_month'] = idx
                 col_map['deposit_month_offset'] = idx
@@ -492,19 +505,31 @@ class LandlordExcelProcessor:
             raise ValueError(f"Invalid RentDeposit: {rent_deposit} (must be non-negative integer)")
         
         # Extract deposit_month_offset (from "Mês Caução" column if it's numeric)
-        # If Mes Caucao contains a number, use it; otherwise fall back to rent_deposit
+        # If Mes Caucao contains a number, use it; otherwise default to 0
         dmo_idx = col_map['deposit_month_offset']
-        deposit_month_offset = rent_deposit  # Default fallback
+        deposit_month_offset = 0  # Default to 0 (no offset)
+        
+        logger.debug(f"Row {row_number}: dmo_idx={dmo_idx}, len(row_values)={len(row_values)}")
+        
         if dmo_idx is not None and dmo_idx < len(row_values):
             dmo_value = row_values[dmo_idx]
-            # Only use it if it's a numeric value (not Yes/No string)
-            if isinstance(dmo_value, (int, float)) and dmo_value >= 0:
-                deposit_month_offset = int(dmo_value)
-                logger.debug(f"Using deposit_month_offset from Mes Caucao: {deposit_month_offset}")
+            logger.debug(f"Row {row_number}: Raw dmo_value from Excel = '{dmo_value}' (type: {type(dmo_value).__name__})")
+            
+            # Try to parse as numeric value
+            if dmo_value is not None and str(dmo_value).strip() != '':
+                try:
+                    parsed_value = int(float(dmo_value))
+                    if parsed_value >= 0:
+                        deposit_month_offset = parsed_value
+                        logger.debug(f"Row {row_number}: Using deposit_month_offset from Mes Caucao: {deposit_month_offset}")
+                    else:
+                        logger.debug(f"Row {row_number}: Mes Caucao value {parsed_value} is negative, using default: 0")
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Row {row_number}: Mes Caucao value '{dmo_value}' parsing failed ({e}), using default: 0")
             else:
-                logger.debug(f"Mes Caucao value '{dmo_value}' is not numeric, using rent_deposit: {rent_deposit}")
+                logger.debug(f"Row {row_number}: Mes Caucao is empty, using default: 0")
         else:
-            logger.debug(f"No Mes Caucao column found, using rent_deposit: {rent_deposit}")
+            logger.debug(f"Row {row_number}: No Mes Caucao column found or out of range, using default: 0")
         
         # Extract months_late
         ml_idx = col_map['months_late']
@@ -660,6 +685,8 @@ class LandlordExcelProcessor:
             from_month = selected_month + tenant.deposit_month_offset
             from_year = selected_year
             
+            logger.debug(f"Date calculation for {tenant.name}: selected_month={selected_month}, deposit_month_offset={tenant.deposit_month_offset}, from_month={from_month}")
+            
             # Handle month overflow
             while from_month > 12:
                 from_month -= 12
@@ -672,13 +699,14 @@ class LandlordExcelProcessor:
             to_date = date_cls(from_year, from_month, last_day)
             
             # Create a basic receipt for this tenant
+            # For Excel: Always use -1.0 to indicate value should be fetched from contract (ignore Excel rent value)
             receipt = ReceiptData(
                 contract_id=tenant.contract_number,
                 from_date=from_date,
                 to_date=to_date,
                 payment_date=payment_date,
                 receipt_type="rent",
-                value=tenant.rent,
+                value=-1.0,  # Always use contract default for Excel imports
                 rent_deposit=tenant.rent_deposit,
                 months_late=tenant.months_late
             )

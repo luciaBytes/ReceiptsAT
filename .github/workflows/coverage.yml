@@ -39,7 +39,7 @@ jobs:
       - name: Upload coverage.xml
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-xml
+          name: coverage-xml-py${{ matrix.python-version }}
           path: coverage.xml
 
       # Optional: upload to Codecov (uncomment and set CODECOV_TOKEN in repo secrets if desired)

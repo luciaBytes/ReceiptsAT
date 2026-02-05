@@ -217,6 +217,12 @@ class SmartImportTab(tk.Frame):
                                         command=self._start_processing, state="disabled")
         self.start_button.pack(side=tk.LEFT, padx=(0, 6))
         
+        # Stop button (Danger style)
+        self.stop_button = ThemedButton(button_frame, style='danger',
+                                       text="⏹ " + get_text('CANCEL_BUTTON'),
+                                       command=self._stop_processing, state="disabled")
+        self.stop_button.pack(side=tk.LEFT, padx=(0, 6))
+        
         # Status field (not subsection)
         status_container = tk.Frame(processing_frame, bg='#1e293b')
         status_container.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 0))
@@ -247,15 +253,15 @@ class SmartImportTab(tk.Frame):
         export_buttons_frame = tk.Frame(results_frame, bg='#1e293b')
         export_buttons_frame.grid(row=0, column=0, sticky=tk.W, pady=(0, 8))
         
-        self.export_session_button = ThemedButton(export_buttons_frame, style='secondary',
+        self.export_results_button = ThemedButton(export_buttons_frame, style='secondary',
                                                   text="💾 Export Results", 
-                                                  command=self._export_session_report)
-        self.export_session_button.pack(side=tk.LEFT, padx=(0, 6))
-        
-        self.export_results_button = ThemedButton(export_buttons_frame, style='tertiary',
-                                                  text="📊 Export Logs", 
                                                   command=self._export_all_results)
         self.export_results_button.pack(side=tk.LEFT, padx=(0, 6))
+        
+        self.export_logs_button = ThemedButton(export_buttons_frame, style='tertiary',
+                                                  text="📊 Export Logs", 
+                                                  command=self._export_logs)
+        self.export_logs_button.pack(side=tk.LEFT, padx=(0, 6))
         
         self.verify_export_button = ThemedButton(export_buttons_frame, style='success',
                                                  text="✅ Verify Receipts", 
@@ -721,6 +727,22 @@ class SmartImportTab(tk.Frame):
             self.current_receipts = receipts
             self.current_alerts = alerts
             
+            # Count errors in alerts (rows that failed to parse)
+            error_count = sum(1 for alert in alerts if 'Failed to parse' in alert.message)
+            warning_count = len(alerts) - error_count
+            
+            # Show summary alert if there are any errors
+            if error_count > 0 or warning_count > 0:
+                alert_msg = f"Excel file processed with issues:\n\n"
+                if error_count > 0:
+                    alert_msg += f"❌ {error_count} row(s) failed to parse (skipped)\n"
+                if warning_count > 0:
+                    alert_msg += f"⚠️  {warning_count} warning(s)\n"
+                alert_msg += f"\n✓ {len(receipts)} receipt(s) successfully processed\n\n"
+                alert_msg += "Check the log for details."
+                
+                messagebox.showwarning("Excel Processing Issues", alert_msg)
+            
             # Show alerts if any
             if alerts:
                 from gui.cross_column_alert_dialog import CrossColumnAlertDialog
@@ -931,24 +953,38 @@ class SmartImportTab(tk.Frame):
         
         # Add data to treeview
         for idx, receipt in enumerate(self.csv_handler.receipts, 1):
-            # Get tenant name from processor's contract cache (populated after validation)
+            # Get tenant name and rent value from processor's contract cache (populated after validation)
             tenant_name = 'N/A'
+            rent_value = receipt.value  # Default to CSV value
+            
             if hasattr(self.processor, '_contracts_data_cache'):
-                contract_data = self.processor._contracts_data_cache.get(receipt.contract_id)
+                # Convert contract_id to string to match cache keys
+                contract_id_str = str(receipt.contract_id)
+                contract_data = self.processor._contracts_data_cache.get(contract_id_str)
                 if contract_data:
+                    # Get tenant name(s)
                     locatarios = contract_data.get('locatarios', [])
                     if locatarios:
                         tenant_names = [t.get('nome', '') for t in locatarios]
                         tenant_name = ', '.join(filter(None, tenant_names)) or 'N/A'
+                    elif contract_data.get('nomeLocatario'):
+                        # Fallback to nomeLocatario field if locatarios array is empty
+                        tenant_name = contract_data.get('nomeLocatario', 'N/A')
+                    
+                    # Get rent value from cached contract data if available
+                    cached_rent = contract_data.get('valorRenda')
+                    if cached_rent and (receipt.value == -1.0 or receipt.value == 0.0):
+                        # Use cached rent if receipt has no value or placeholder value
+                        rent_value = cached_rent
             
             tree.insert('', 'end', values=(
                 idx,
-                receipt.contract_id,
+                contract_id_str if hasattr(self.processor, '_contracts_data_cache') else receipt.contract_id,
                 tenant_name,
                 receipt.from_date,
                 receipt.to_date,
                 receipt.payment_date,
-                f"{receipt.value:.2f}"
+                f"{rent_value:.2f}" if rent_value > 0 else "N/A"
             ))
         
         # Grid layout for table components
@@ -969,15 +1005,32 @@ class SmartImportTab(tk.Frame):
         # Clear cached validation when loading new CSV
         self.cached_validation_report = None
         
-        success, message = self.csv_handler.load_csv(file_path)
+        success, errors = self.csv_handler.load_csv(file_path)
         
         if success:
             self.on_log("INFO", f"CSV loaded: {file_path}")
             self.on_log("INFO", f"Found {len(self.csv_handler.receipts)} receipts")
             self._update_button_states()
         else:
-            self.on_log("ERROR", f"Failed to load CSV: {message}")
-            messagebox.showerror("CSV Error", message)
+            # Show error details
+            error_count = len(errors)
+            error_msg = f"CSV file has {error_count} error(s):\n\n"
+            
+            # Show first 5 errors in the dialog
+            display_errors = errors[:5]
+            for error in display_errors:
+                error_msg += f"• {error}\n"
+            
+            if error_count > 5:
+                error_msg += f"\n... and {error_count - 5} more errors.\n"
+            
+            error_msg += "\nCheck the log for complete details."
+            
+            self.on_log("ERROR", f"Failed to load CSV: {error_count} errors found")
+            for error in errors:
+                self.on_log("ERROR", f"  {error}")
+            
+            messagebox.showerror("CSV Validation Errors", error_msg)
     
     def _validate_csv_file_from_receipts(self, receipts: List[ReceiptData]):
         """Load receipts directly into CSV handler and enable buttons."""
@@ -999,6 +1052,7 @@ class SmartImportTab(tk.Frame):
         # Start processing in background thread
         self.stop_requested = False
         self.start_button.config(state="disabled")
+        self.stop_button.config(state="normal")
         
         mode = self.mode_var.get()
         dry_run = self.dry_run_var.get()
@@ -1225,11 +1279,44 @@ class SmartImportTab(tk.Frame):
         self.on_log("ERROR", f"Contract validation error: {error_message}")
         messagebox.showerror("Validation Error", f"Contract validation failed:\n{error_message}")
     
+    def _export_logs(self):
+        """Export the log window content to a file."""
+        # Get log content from the log text widget
+        log_content = self.log_text.get("1.0", tk.END).strip()
+        
+        if not log_content:
+            messagebox.showinfo("No Logs", "No logs available to export.")
+            return
+        
+        # Ask for file location
+        default_filename = f"logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        file_path = filedialog.asksaveasfilename(
+            title="Save Log File",
+            defaultextension=".txt",
+            initialfile=default_filename,
+            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")]
+        )
+        
+        if not file_path:
+            return  # User cancelled
+        
+        try:
+            # Write log content to file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(log_content)
+            
+            self.on_log("INFO", f"Logs exported to: {file_path}")
+            messagebox.showinfo("Export Successful", f"Logs exported to:\n{file_path}")
+        except Exception as e:
+            logger.exception("Failed to export logs")
+            self.on_log("ERROR", f"Failed to export logs: {str(e)}")
+            messagebox.showerror("Export Failed", f"Failed to export logs:\n{str(e)}")
+    
     def _export_all_results(self):
-        """Export both successful receipts and error reports."""
+        """Export successful receipts and error reports to separate files."""
         results = self.processor.get_results()
         if not results:
-            messagebox.showinfo("Information", "Nenhum resultado de processamento para exportar")
+            messagebox.showinfo("Information", "No processing results to export")
             return
         
         # Check what we have to export
@@ -1240,69 +1327,86 @@ class SmartImportTab(tk.Frame):
             messagebox.showinfo("No Data", "No results to export.")
             return
         
-        # Ask for file format
-        file_path = filedialog.asksaveasfilename(
-            title="Save Export Files",
-            defaultextension=".csv",
-            filetypes=[("CSV Files", "*.csv"), ("Excel Files", "*.xlsx"), ("All Files", "*.*")]
-        )
-        
-        if not file_path:
-            return  # User cancelled
-        
-        # Determine file format
-        file_ext = os.path.splitext(file_path)[1].lower()
-        is_excel = file_ext == '.xlsx'
-        
-        # Get base filename without extension
-        base_path = os.path.splitext(file_path)[0]
-        
         success_count = 0
         error_count = 0
+        success_file = None
+        error_file = None
         
-        # Export successful receipts if any
+        # Handle successful results export with append option
         if successful_results:
-            if is_excel:
-                success_file = f"{base_path}_successful.xlsx"
-            else:
-                success_file = f"{base_path}_successful.csv"
+            default_filename = f"successful_receipts_{datetime.now().strftime('%Y%m%d')}.csv"
+            success_file = filedialog.asksaveasfilename(
+                title="Save Successful Receipts (or select existing file to append)",
+                defaultextension=".csv",
+                initialfile=default_filename,
+                filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+            )
             
-            report_data = self.processor.generate_session_export_data()
-            if report_data:
-                if is_excel:
-                    success = self.csv_handler.export_session_report_excel(report_data, success_file, append=False)
+            if success_file:
+                # Check if file already exists
+                file_exists = os.path.exists(success_file)
+                append_mode = False
+                
+                if file_exists:
+                    # Ask user if they want to append or overwrite
+                    response = messagebox.askyesnocancel(
+                        "File Exists",
+                        f"The file already exists:\n{success_file}\n\n"
+                        "Yes: Append successful receipts to existing file\n"
+                        "No: Overwrite file with new data\n"
+                        "Cancel: Cancel export"
+                    )
+                    
+                    if response is None:  # Cancel
+                        return
+                    elif response:  # Yes - append
+                        append_mode = True
+                        self.on_log("INFO", "Appending successful receipts to existing file...")
+                    else:  # No - overwrite
+                        append_mode = False
+                        self.on_log("INFO", "Creating new successful receipts file...")
                 else:
-                    success = self.csv_handler.export_session_report(report_data, success_file, append=False)
+                    self.on_log("INFO", "Creating new successful receipts file...")
+                
+                # Export successful receipts
+                report_data = self.processor.generate_session_export_data()
+                if report_data:
+                    success = self.csv_handler.export_session_report(report_data, success_file, append=append_mode)
+                    
+                    if success:
+                        success_count = len(successful_results)
+                        mode_text = "appended to" if append_mode else "saved to"
+                        self.on_log("INFO", f"Successful receipts {mode_text}: {success_file}")
+        
+        # Handle error results export
+        if failed_results:
+            default_error_filename = f"errors_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            error_file = filedialog.asksaveasfilename(
+                title="Save Error Report",
+                defaultextension=".csv",
+                initialfile=default_error_filename,
+                filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+            )
+            
+            if error_file:
+                success = self.csv_handler.export_errors_report(results, error_file)
                 
                 if success:
-                    success_count = len(successful_results)
-                    self.on_log("INFO", f"Successful receipts exported to: {success_file}")
-        
-        # Export error report if any
-        if failed_results:
-            if is_excel:
-                error_file = f"{base_path}_errors.xlsx"
-            else:
-                error_file = f"{base_path}_errors.csv"
-            
-            if is_excel:
-                success = self.csv_handler.export_errors_report_excel(results, error_file)
-            else:
-                success = self.csv_handler.export_errors_report(results, error_file)
-            
-            if success:
-                error_count = len(failed_results)
-                self.on_log("INFO", f"Error report exported to: {error_file}")
+                    error_count = len(failed_results)
+                    self.on_log("INFO", f"Error report saved to: {error_file}")
         
         # Show summary
-        summary_parts = []
-        if success_count > 0:
-            summary_parts.append(f"✅ Successful: {success_count} receipts")
-        if error_count > 0:
-            summary_parts.append(f"❌ Failed: {error_count} receipts")
-        
-        summary = "Export Complete!\n\n" + "\n".join(summary_parts)
-        messagebox.showinfo("Export Successful", summary)
+        if success_count > 0 or error_count > 0:
+            summary_parts = []
+            if success_count > 0:
+                summary_parts.append(f"✅ Successful: {success_count} receipts")
+                summary_parts.append(f"   File: {os.path.basename(success_file)}")
+            if error_count > 0:
+                summary_parts.append(f"❌ Failed: {error_count} receipts")
+                summary_parts.append(f"   File: {os.path.basename(error_file)}")
+            
+            summary = "Export Complete!\n\n" + "\n".join(summary_parts)
+            messagebox.showinfo("Export Successful", summary)
     
     def _verify_and_export_receipts(self):
         """Verify receipts in portal and export detailed report."""
@@ -1562,6 +1666,7 @@ class SmartImportTab(tk.Frame):
         
         # Update UI
         self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
         
         # Show summary
         summary_parts = []
@@ -1579,6 +1684,7 @@ class SmartImportTab(tk.Frame):
         self.status_var.set("Stopped")
         self.on_log("WARNING", "Processing stopped by user")
         self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
         messagebox.showinfo("Stopped", "Processing was stopped.")
     
     def _processing_error(self, error_msg: str):
@@ -1586,7 +1692,21 @@ class SmartImportTab(tk.Frame):
         self.status_var.set("Error")
         self.on_log("ERROR", f"Processing error: {error_msg}")
         self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
         messagebox.showerror("Processing Error", f"An error occurred:\n\n{error_msg}")
+    
+    def _stop_processing(self):
+        """Stop processing by setting a flag and updating UI."""
+        self.on_log("INFO", "Stop requested")
+        self.stop_requested = True
+        self.status_var.set("Stopping...")
+        
+        # Update UI immediately
+        self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
+        
+        # Reset progress
+        self.progress_var.set(0)
     
     def _show_step_confirmation_dialog(self, receipt_data, form_data):
         """Show confirmation dialog for step-by-step processing."""
