@@ -1267,13 +1267,6 @@ class SmartImportTab(tk.Frame):
             message_parts.append(f"\n VALIDATION ISSUES:")
             for error in validation_report['validation_errors']:
                 message_parts.append(f"  • {error}")
-        
-        # Log results but don't show automatic popup
-        # User can see results in the log panel
-        self.on_log("INFO", "=" * 60)
-        for line in message_parts:
-            self.on_log("INFO", line)
-        self.on_log("INFO", "=" * 60)
     
     def _validation_error(self, error_message: str):
         """Handle validation error."""
